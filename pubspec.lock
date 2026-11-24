@@ -753,10 +753,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_vodozemac
-      sha256: d2705fed826e6846901b5f05ff354cbcc724593fe2039b68aff1eccf139ab5cb
+      sha256: f9888e4984d6fd5724c49c0acf94d72fc31c71b394644e92825956d1e1503b75
       url: "https://pub.dev"
     source: hosted
-    version: "0.9.0"
+    version: "0.9.2"
   flutter_web_auth_2:
     dependency: "direct main"
     description:
@@ -2341,10 +2341,10 @@ packages:
     dependency: "direct dev"
     description:
       name: vodozemac
-      sha256: "4099e87058bf7ed910e22943bcc05db229f733ac05a700e5903722be7e62fcd1"
+      sha256: d9e63062f635a91a4463c1bcb7eb5317a5737ebca8b91c5734c634d7bdd7cb67
       url: "https://pub.dev"
     source: hosted
-    version: "0.9.1"
+    version: "0.9.2"
   wakelock_plus:
     dependency: "direct main"
     description:
