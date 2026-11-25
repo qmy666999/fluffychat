@@ -51,13 +51,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
         title: Text(l10n.bottomTabDiscover),
         centerTitle: true,
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            tooltip: l10n.addToContacts,
-            icon: const Icon(Icons.add),
-            onPressed: () => context.push('/contacts/add'),
-          ),
-        ],
+        // 发现页没有「添加联系人」入口，右上角保持干净（微信也只有扫一扫/搜索，
+        // 扫一扫见待做项）。
       ),
       bottomNavigationBar: const ChatListBottomBar(currentIndex: 2),
       body: ListView(

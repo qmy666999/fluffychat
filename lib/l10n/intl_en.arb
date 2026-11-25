@@ -1393,7 +1393,7 @@
             }
         }
     },
-    "redactMessage": "Redact message",
+    "redactMessage": "Unsend",
     "@redactMessage": {
         "type": "String",
         "placeholders": {}

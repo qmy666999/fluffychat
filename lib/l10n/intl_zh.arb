@@ -1126,7 +1126,7 @@
             }
         }
     },
-    "redactMessage": "删除消息",
+    "redactMessage": "撤回",
     "@redactMessage": {
         "type": "String",
         "placeholders": {}
@@ -1901,7 +1901,7 @@
     "chatDescriptionHasBeenChanged": "聊天描述已被更改",
     "noChatDescriptionYet": "尚未创建聊天描述。",
     "invalidServerName": "服务器名称无效",
-    "redactMessageDescription": "消息将为此对话中所有参与者删除。此操作无法撤销。",
+    "redactMessageDescription": "撤回后，这条消息会从所有参与者的对话里消失（双方都看不到）。此操作无法撤销。",
     "optionalRedactReason": "（可选）删除此消息的原因...",
     "setChatDescription": "设置聊天描述",
     "setColorTheme": "设置主题颜色：",
