@@ -20,7 +20,7 @@ class ClientChooserButton extends StatelessWidget {
 
   const ClientChooserButton(this.controller, {super.key});
 
-  List<PopupMenuEntry<Object>> _bundleMenuItems(BuildContext context) {
+  List<PopupMenuEntry<Object>> bundleMenuItems(BuildContext context) {
     final matrix = Matrix.of(context);
     final bundles = matrix.accountBundles.keys.toList()
       ..sort(
@@ -182,8 +182,8 @@ class ClientChooserButton extends StatelessWidget {
         child: PopupMenuButton<Object>(
           key: Key('accounts_and_settings_buttons'),
           tooltip: L10n.of(context).accountsAndSettings,
-          onSelected: (o) => _clientSelected(o, context),
-          itemBuilder: _bundleMenuItems,
+          onSelected: (o) => clientSelected(o, context),
+          itemBuilder: bundleMenuItems,
           icon: Avatar(
             mxContent: snapshot.data?.avatarUrl,
             name: snapshot.data?.displayName ?? client?.userID?.localpart,
@@ -194,7 +194,7 @@ class ClientChooserButton extends StatelessWidget {
     );
   }
 
-  Future<void> _clientSelected(Object object, BuildContext context) async {
+  Future<void> clientSelected(Object object, BuildContext context) async {
     if (object is Client) {
       controller.setActiveClient(object);
     } else if (object is String) {

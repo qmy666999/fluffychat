@@ -3,17 +3,19 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list.dart';
-import 'package:fluffychat/pages/chat_list/client_chooser_button.dart';
 import 'package:fluffychat/utils/sync_status_localization.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
 import '../../widgets/matrix.dart';
 
+/// 顶栏：标题居中 + 右上角搜索图标。
+///
+/// 搜索框本身没有删掉，只是收进了搜索模式：点放大镜才出现输入框，
+/// 按返回/关闭再收起。原来的搜索逻辑（controller.startSearch / cancelSearch）不变。
 class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
   final ChatListController controller;
   final bool globalSearch;
@@ -32,9 +34,10 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
 
     return SliverAppBar(
       floating: true,
-      toolbarHeight: 72,
+      toolbarHeight: 64,
       pinned: isColumnMode,
       scrolledUnderElevation: 0,
+      centerTitle: true,
       shape: isColumnMode
           ? Border(bottom: BorderSide(color: theme.dividerColor, width: 1))
           : null,
@@ -52,6 +55,23 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
               client.onSync.value != null &&
               status.status != SyncStatus.error &&
               client.prevBatch != null;
+
+          if (!controller.isSearchMode) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(L10n.of(context).chats),
+                // 同步状态/断线提示原来在搜索框的 hintText 里，位置挪到标题下面，
+                // 不然把输入框收成图标之后这条信息就没地方显示了。
+                if (!hide)
+                  Text(
+                    status.calcLocalizedString(context),
+                    style: theme.textTheme.bodySmall,
+                  ),
+              ],
+            );
+          }
+
           return TextField(
             controller: controller.searchController,
             focusNode: controller.searchFocusNode,
@@ -65,52 +85,16 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                 borderSide: BorderSide.none,
                 borderRadius: BorderRadius.circular(99),
               ),
-              hintText: hide
-                  ? L10n.of(context).searchChatsRooms
-                  : status.calcLocalizedString(context),
+              hintText: L10n.of(context).searchChatsRooms,
               hintStyle: TextStyle(
                 color: theme.colorScheme.onPrimaryContainer,
                 fontWeight: FontWeight.normal,
               ),
-
-              prefixIcon: hide
-                  ? controller.isSearchMode
-                        ? IconButton(
-                            tooltip: L10n.of(context).cancel,
-                            icon: const Icon(Icons.close_outlined),
-                            onPressed: controller.cancelSearch,
-                            color: theme.colorScheme.onPrimaryContainer,
-                          )
-                        : isColumnMode ||
-                              (controller.spaces.isEmpty &&
-                                  !AppSettings.displayNavigationRail.value)
-                        ? IconButton(
-                            tooltip: L10n.of(context).search,
-                            onPressed: controller.startSearch,
-                            icon: Icon(
-                              Icons.search_outlined,
-                              color: theme.colorScheme.onPrimaryContainer,
-                            ),
-                          )
-                        : IconButton(
-                            tooltip: L10n.of(context).displayNavigationRail,
-                            onPressed: controller.openNavrail,
-                            icon: Icon(
-                              Icons.menu,
-                              color: theme.colorScheme.onPrimaryContainer,
-                            ),
-                          )
-                  : SizedBox(
-                      width: 8,
-                      height: 8,
-                      child: Center(
-                        child: CircularProgressIndicator.adaptive(
-                          strokeWidth: 2,
-                          value: status.progress,
-                        ),
-                      ),
-                    ),
-              suffixIcon: controller.isSearchMode && globalSearch
+              prefixIcon: Icon(
+                Icons.search_outlined,
+                color: theme.colorScheme.onPrimaryContainer,
+              ),
+              suffixIcon: globalSearch
                   ? controller.isSearching
                         ? const Padding(
                             padding: EdgeInsets.symmetric(
@@ -139,11 +123,25 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                               maxLines: 2,
                             ),
                           )
-                  : SizedBox(width: 0, child: ClientChooserButton(controller)),
+                  : null,
             ),
           );
         },
       ),
+      actions: [
+        if (controller.isSearchMode)
+          IconButton(
+            tooltip: L10n.of(context).cancel,
+            icon: const Icon(Icons.close_outlined),
+            onPressed: controller.cancelSearch,
+          )
+        else
+          IconButton(
+            tooltip: L10n.of(context).search,
+            icon: const Icon(Icons.search_outlined),
+            onPressed: controller.startSearch,
+          ),
+      ],
     );
   }
 

@@ -88,6 +88,8 @@ class ChatListItem extends StatelessWidget {
                     width: Avatar.defaultSize,
                     height: Avatar.defaultSize,
                     child: Stack(
+                      // 未读角标要贴到头像右上角，允许它探出 40x40 的框。
+                      clipBehavior: Clip.none,
                       children: [
                         if (space != null)
                           Positioned(
@@ -158,7 +160,7 @@ class ChatListItem extends StatelessWidget {
                         ),
                         Positioned(
                           top: 0,
-                          right: 0,
+                          left: 0,
                           child: GestureDetector(
                             onTap: () => onLongPress?.call(context),
                             child: AnimatedScale(
@@ -176,6 +178,12 @@ class ChatListItem extends StatelessWidget {
                             ),
                           ),
                         ),
+                        // 未读角标：从头像右侧挪到头像右上角。
+                        Positioned(
+                          top: -4,
+                          right: -4,
+                          child: UnreadBubble(room: room),
+                        ),
                       ],
                     ),
                   ),
@@ -191,11 +199,6 @@ class ChatListItem extends StatelessWidget {
                       softWrap: false,
                     ),
                   ),
-                  if (isMuted)
-                    const Padding(
-                      padding: EdgeInsets.only(left: 4.0),
-                      child: Icon(Icons.notifications_off_outlined, size: 16),
-                    ),
                   if (room.isLowPriority)
                     Padding(
                       padding: EdgeInsets.only(
@@ -358,7 +361,7 @@ class ChatListItem extends StatelessWidget {
                                                 ).inviteGroupChat)
                                     : body ?? L10n.of(context).noMessagesYet,
                                 softWrap: false,
-                                maxLines: room.notificationCount >= 1 ? 2 : 1,
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   decoration: room.lastEvent?.redacted == true
@@ -370,7 +373,9 @@ class ChatListItem extends StatelessWidget {
                           ),
                   ),
                   const SizedBox(width: 8),
-                  UnreadBubble(room: room),
+                  // 静音图标挪到第二行最右；未读角标去了头像右上角。
+                  if (isMuted)
+                    const Icon(Icons.notifications_off_outlined, size: 16),
                 ],
               ),
               onTap: onTap,

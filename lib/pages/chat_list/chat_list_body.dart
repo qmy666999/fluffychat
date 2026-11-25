@@ -128,54 +128,6 @@ class ChatListViewBody extends StatelessWidget {
                           ),
                   ),
                 ],
-                if (client.rooms.isNotEmpty && !controller.isSearchMode)
-                  Container(
-                    height: 36 + 8 + 8,
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: ListView(
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                      shrinkWrap: true,
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        ...ActiveFilter.values
-                            .where((filter) => filter != ActiveFilter.tag)
-                            .map(
-                              (filter) => Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4.0,
-                                ),
-                                child: Center(
-                                  child: FilterChip(
-                                    selected: filter == controller.activeFilter,
-                                    onSelected: (_) => controller
-                                        .setActiveFilter(filter, null),
-                                    label: Text(
-                                      filter.toLocalizedString(context),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ...controller.roomTags.entries.map(
-                          (entry) => Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4.0,
-                            ),
-                            child: Center(
-                              child: FilterChip(
-                                selected: entry.key == controller.activeTag,
-                                onSelected: (_) => controller.setActiveFilter(
-                                  ActiveFilter.tag,
-                                  entry.key,
-                                ),
-                                label: Text(entry.key.replaceFirst('u.', '')),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 if (controller.isSearchMode)
                   SearchTitle(
                     title: L10n.of(context).chats,

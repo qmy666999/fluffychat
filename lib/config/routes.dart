@@ -22,6 +22,7 @@ import 'package:fluffychat/pages/invitation_selection/invitation_selection.dart'
 import 'package:fluffychat/pages/login/login.dart';
 import 'package:fluffychat/pages/new_group/new_group.dart';
 import 'package:fluffychat/pages/new_private_chat/new_private_chat.dart';
+import 'package:fluffychat/pages/placeholder/placeholder_page.dart';
 import 'package:fluffychat/pages/register/register.dart';
 import 'package:fluffychat/pages/settings/settings.dart';
 import 'package:fluffychat/pages/settings_3pid/settings_3pid.dart';
@@ -103,6 +104,22 @@ abstract class AppRoutes {
           redirect: loggedInRedirect,
         ),
       ],
+    ),
+    GoRoute(
+      path: '/contacts',
+      pageBuilder: (context, state) => defaultPageBuilder(
+        context,
+        state,
+        const PlaceholderPage(kind: PlaceholderKind.contacts),
+      ),
+    ),
+    GoRoute(
+      path: '/discover',
+      pageBuilder: (context, state) => defaultPageBuilder(
+        context,
+        state,
+        const PlaceholderPage(kind: PlaceholderKind.discover),
+      ),
     ),
     GoRoute(
       path: '/logs',

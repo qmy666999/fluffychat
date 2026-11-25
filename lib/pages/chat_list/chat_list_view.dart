@@ -7,6 +7,7 @@ import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/pages/chat_list/chat_list.dart';
+import 'package:fluffychat/pages/chat_list/chat_list_bottom_bar.dart';
 import 'package:fluffychat/pages/chat_list/navigation_rail.dart';
 import 'package:fluffychat/pages/chat_list/start_chat_fab.dart';
 import 'package:material_ui/material_ui.dart';
@@ -104,6 +105,12 @@ class ChatListView extends StatelessWidget {
                         ),
                       )
                     : const SizedBox.shrink(),
+                bottomNavigationBar:
+                    !controller.isSearchMode &&
+                        controller.activeSpaceId == null &&
+                        !FluffyThemes.isColumnMode(context)
+                    ? ChatListBottomBar(controller)
+                    : null,
               ),
             ),
           ),

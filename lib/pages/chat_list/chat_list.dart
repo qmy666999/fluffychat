@@ -463,16 +463,10 @@ class ChatListController extends State<ChatList>
         )
         .listen(_updateRoomTags);
 
-    if (roomTags.containsKey(AppSettings.chatFilter.value)) {
-      activeFilter = ActiveFilter.tag;
-      activeTag = AppSettings.chatFilter.value;
-    } else {
-      activeFilter =
-          ActiveFilter.values.singleWhereOrNull(
-            (filter) => AppSettings.chatFilter.value == filter.name,
-          ) ??
-          ActiveFilter.allChats;
-    }
+    // 顶部筛选标签整排已经移除（见 chat_list_body.dart），没有切换入口了，
+    // 所以这里固定成「全部」，避免之前存下的未读/群组/标签筛选把人卡住。
+    activeFilter = ActiveFilter.allChats;
+    activeTag = null;
 
     _processPushHelperCrashReport();
 
