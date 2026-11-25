@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/date_time_extension.dart';
@@ -253,7 +254,12 @@ class UserDialog extends StatelessWidget {
                         final router = GoRouter.of(context);
                         final roomIdResult = await showFutureLoadingDialog(
                           context: context,
-                          future: () => client.startDirectChat(profile.userId),
+                          future: () => client.startDirectChat(
+                            profile.userId,
+                            // SDK 默认会给「对方有加密密钥」的私聊自动开加密，
+                            // 这里按设置显式传，默认不加密。
+                            enableEncryption: AppSettings.encryptNewChats.value,
+                          ),
                         );
                         final roomId = roomIdResult.result;
                         if (roomId == null) return;

@@ -6,6 +6,7 @@
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/new_group/new_group_view.dart';
 import 'package:fluffychat/utils/file_selector.dart';
@@ -34,6 +35,12 @@ class NewGroupController extends State<NewGroup> {
 
   bool publicGroup = false;
   bool groupCanBeFound = false;
+
+  /// 建群时是否加密，默认跟着全局设置（默认不加密）。
+  bool enableEncryption = AppSettings.encryptNewChats.value;
+
+  void toggleEncryption(bool value) =>
+      setState(() => enableEncryption = value);
 
   Uint8List? avatar;
 
@@ -75,6 +82,8 @@ class NewGroupController extends State<NewGroup> {
     final client = Matrix.of(context).client;
 
     final roomId = await client.createGroupChat(
+      // SDK 默认会给非公开群开加密；这里显式按开关传，默认不加密。
+      enableEncryption: enableEncryption && !publicGroup,
       visibility: groupCanBeFound
           ? sdk.Visibility.public
           : sdk.Visibility.private,

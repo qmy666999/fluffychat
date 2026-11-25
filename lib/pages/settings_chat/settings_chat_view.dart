@@ -36,6 +36,11 @@ class SettingsChatView extends StatelessWidget {
           child: Column(
             children: [
               SettingsSwitchListTile.adaptive(
+                title: L10n.of(context).encryptNewChats,
+                subtitle: L10n.of(context).encryptNewChatsDescription,
+                setting: AppSettings.encryptNewChats,
+              ),
+              SettingsSwitchListTile.adaptive(
                 title: L10n.of(context).formattedMessages,
                 subtitle: L10n.of(context).formattedMessagesDescription,
                 setting: AppSettings.renderHtml,

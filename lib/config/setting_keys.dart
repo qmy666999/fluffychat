@@ -43,6 +43,9 @@ enum AppSettings<T> {
   sendTypingNotifications<bool>('chat.fluffy.send_typing_notifications', true),
   sendPublicReadReceipts<bool>('chat.fluffy.send_public_read_receipts', true),
   swipeRightToLeftToReply<bool>('chat.fluffy.swipeRightToLeftToReply', true),
+  // 新建聊天默认是否加密。自建服务器上机器人要读消息、换设备要保历史，
+  // 所以默认关掉；想加密的用户可以自己开。
+  encryptNewChats<bool>('chat.fluffy.encrypt_new_chats', false),
   sendOnEnter<bool>('chat.fluffy.send_on_enter', false),
   displayNavigationRail<bool>('chat.fluffy.display_navigation_rail', false),
   shareKeysWith<String>('chat.fluffy.share_keys_with_2', 'all'),

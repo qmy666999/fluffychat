@@ -137,8 +137,11 @@ class NewGroupView extends StatelessWidget {
                         L10n.of(context).enableEncryption,
                         style: TextStyle(color: theme.colorScheme.onSurface),
                       ),
-                      value: !controller.publicGroup,
-                      onChanged: null,
+                      value:
+                          controller.enableEncryption && !controller.publicGroup,
+                      onChanged: controller.publicGroup
+                          ? null
+                          : controller.toggleEncryption,
                     ),
             ),
             AnimatedSize(

@@ -2893,6 +2893,8 @@
     "changeServer": "更换服务器",
     "serverAddress": "服务器地址",
     "pleaseEnterYourHomeserver": "请填写服务器地址",
+    "encryptNewChats": "新建聊天默认加密",
+    "encryptNewChatsDescription": "默认关闭：关掉后机器人能读消息、换设备也不丢历史；打开则更私密，但换设备后加密期间的历史消息无法恢复。",
     "newFriends": "新的朋友",
     "friendsSection": "好友",
     "addToContacts": "添加到通讯录",

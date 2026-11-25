@@ -2893,6 +2893,8 @@
     "changeServer": "Change server",
     "serverAddress": "Server address",
     "pleaseEnterYourHomeserver": "Please enter the server address",
+    "encryptNewChats": "Encrypt new chats by default",
+    "encryptNewChatsDescription": "Off by default: bots can read plaintext messages and history survives reinstalling. Turning it on keeps messages private but encrypted history is lost when you switch devices.",
     "newFriends": "New friends",
     "friendsSection": "Friends",
     "addToContacts": "Add to contacts",

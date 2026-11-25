@@ -328,6 +328,8 @@ class FriendsService {
       if (room.membership != Membership.join) continue;
       if (room.directChatMatrixID == userId) return room.id;
     }
+    // 这里不带 m.room.encryption 初始状态，所以房间是明文的：
+    // 好友会话要让机器人也能读，加密房间换设备还会丢历史。
     final roomId = await client.createRoom(
       invite: [userId],
       isDirect: true,
