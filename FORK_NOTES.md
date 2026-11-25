@@ -39,6 +39,27 @@
 
 > 多账户能力保留：设置 → 添加账户 → 创建新账户 走的也是这个注册页。
 
+### 注册请求（重要，踩过的坑）
+
+这台 Synapse（1.67）**不支持** `GET /_matrix/client/v3/register`：
+
+```
+GET  → 400 {"errcode":"M_UNRECOGNIZED","error":"Unrecognized request"}
+POST → 200（body 带 "auth":{"type":"m.login.dummy"}，直接注册成功）
+```
+
+所以注册页**不能**先去 GET 探测注册流程（早期版本就是这么写的，结果页面上显示
+"Unrecognized request"），现在的做法是：
+
+1. 用 `http` 包直接 POST `https://<homeserver>/_matrix/client/v3/register`
+   （URL 自己拼，不依赖 SDK 的路径拼接；`debugPrint` 会打印 `REGISTER URL = ...`
+   和 `REGISTER RESP = <status> <body>`）；
+2. body 里带 `auth: {type: m.login.dummy}` 和 `inhibit_login: true`，
+   避免注册时多出一个没人用的设备、也避免 access_token 出现在日志里；
+3. 200 → 拿响应里的 `user_id`，再用同一套凭据 `client.login(...)`，让 SDK 接管会话；
+4. 非 200 → 错误框里显示「状态码 + 服务器原文」，还会附一句人话解释
+   （用户名被占/密码太弱/未开放注册/需要网页验证等），下次出问题一眼能看出来。
+
 ---
 
 ## 2. 构建环境（这台电脑已经装好）
@@ -90,10 +111,15 @@ flutter build apk --release --target-platform android-arm64
 
 ## 3. 国内网络：构建时踩过的三个坑
 
-1. **Gradle 发行包**：`services.gradle.org` 直连超时。把
-   `android/gradle/wrapper/gradle-wrapper.properties` 的 `distributionUrl` 临时改成
-   `https\://mirrors.cloud.tencent.com/gradle/gradle-9.3.1-all.zip`
-   （**本机适配，不要提交**）。
+1. **Gradle 发行包**：`services.gradle.org` 直连很慢（≈250 KB/s，224 MB 要十几分钟）。
+   已把解压好的 9.3.1 发行包塞进 wrapper 缓存，构建会直接命中、不再下载：
+   ```
+   %USERPROFILE%\.gradle\wrapper\dists\gradle-9.3.1-all\<hash>\gradle-9.3.1\
+   %USERPROFILE%\.gradle\wrapper\dists\gradle-9.3.1-all\<hash>\gradle-9.3.1-all.zip.ok
+   ```
+   如果哪天清了 `~\.gradle`，可以在 `android/gradle/wrapper/gradle-wrapper.properties`
+   里把 `distributionUrl` 临时换成
+   `https\://mirrors.cloud.tencent.com/gradle/gradle-9.3.1-all.zip`（**本机适配，不要提交**）。
 2. **livekit_ffi 预编译库**：`livekit_ffi` 的 native-assets hook 会从 GitHub Releases
    下载 `build-aarch64-linux-android.zip`，直连必挂。已下载好并放进 pub 缓存：
    ```

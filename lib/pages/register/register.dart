@@ -2,19 +2,23 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
 import 'register_view.dart';
 
 /// Thrown when an account could not be created for a reason which is not
-/// covered by a [MatrixException], for example because the homeserver does not
-/// allow registrations at all.
+/// covered by an HTTP/Matrix error, for example when the homeserver can not be
+/// reached at all.
 class RegisterException implements Exception {
   final String message;
 
@@ -28,10 +32,9 @@ class RegisterException implements Exception {
 ///
 /// FluffyChat upstream has no in app registration: its sign up flow only
 /// forwards to the registration website of the selected homeserver. This page
-/// creates the account directly through the Matrix client-server API
-/// (`POST /_matrix/client/v3/register`) and connects the client with the
-/// session which the homeserver returns, so a new user can start chatting
-/// without leaving the app.
+/// creates the account through the Matrix client-server API
+/// (`POST /_matrix/client/v3/register`) and logs the new account in afterwards
+/// so that a fresh user can start chatting without leaving the app.
 class Register extends StatefulWidget {
   /// A client which is already connected to the homeserver where the account
   /// should be created on.
@@ -56,7 +59,9 @@ class RegisterController extends State<Register> {
   String? usernameError;
   String? passwordError;
 
-  /// A general error which is not bound to a single input field.
+  /// A general error which is not bound to a single input field. It always
+  /// carries the raw status code and response body, so a failing request can be
+  /// diagnosed without a debugger.
   String? error;
 
   bool loading = false;
@@ -67,7 +72,11 @@ class RegisterController extends State<Register> {
 
   static const int minPasswordLength = 8;
 
+  /// The only registration stage this page can complete by itself. Servers
+  /// which require anything else have to be handled on their website.
   static const String dummyAuthType = 'm.login.dummy';
+
+  static const Duration requestTimeout = Duration(seconds: 30);
 
   Client? _client;
 
@@ -124,56 +133,15 @@ class RegisterController extends State<Register> {
     }
     return loginClient;
   }
-  /// Reads the registration flows which the homeserver offers.
-  ///
-  /// Returns the `stages` of every flow. An open Synapse with
-  /// `enable_registration: true` and no captcha answers
-  /// `{"flows": [{"stages": ["m.login.dummy"]}]}`.
-  Future<List<List<String>>> _registrationFlows(Client client) async {
-    final response = await client.request(
-      RequestType.GET,
-      '/client/v3/register',
-    );
-    final flows = response['flows'];
-    if (flows is! List) return const [];
-    final result = <List<String>>[];
-    for (final flow in flows.whereType<Map>()) {
-      final stages = flow['stages'];
-      if (stages is! List) continue;
-      result.add(stages.whereType<String>().toList());
-    }
-    return result;
-  }
 
-  /// Creates the account and connects [client] with the new session.
-  ///
-  /// A registration which only requires `m.login.dummy` is usually accepted
-  /// without a user interactive authentication round trip. Servers which still
-  /// answer with a `401` and a `session` get one more try with that session.
-  Future<void> _createAccount(
-    Client client,
-    String username,
-    String password,
-  ) async {
-    var auth = AuthenticationData(type: dummyAuthType);
-    for (var attempt = 0; ; attempt++) {
-      try {
-        await client.register(
-          username: username,
-          password: password,
-          initialDeviceDisplayName: PlatformInfos.appDisplayName,
-          auth: auth,
-        );
-        return;
-      } on MatrixException catch (exception) {
-        final session = exception.session;
-        if (attempt > 1 || session == null) rethrow;
-        auth = AuthenticationData(
-          type: dummyAuthType,
-          session: session,
-        );
-      }
-    }
+  /// Builds the registration endpoint URL without relying on any SDK path
+  /// joining, so the request goes to exactly `/_matrix/client/v3/register`.
+  Uri registrationUrl(Client client) {
+    final base = client.homeserver.toString().replaceFirst(
+      RegExp(r'/+$'),
+      '',
+    );
+    return Uri.parse('$base/_matrix/client/v3/register');
   }
 
   Future<void> register() async {
@@ -205,54 +173,119 @@ class RegisterController extends State<Register> {
     if (usernameError != null || passwordError != null) return;
 
     setState(() => loading = true);
+
+    Client? client;
     try {
-      final client = await _resolveClient();
-
-      final flows = await _registrationFlows(client);
-      if (flows.isEmpty) {
-        throw RegisterException(l10n.registerRegistrationDisabled);
-      }
-      // Only flows which can be completed with just m.login.dummy are
-      // supported. Anything else (captcha, terms, email verification) needs
-      // interaction with the registration website of the homeserver.
-      final dummyOnly = flows.any(
-        (stages) => stages.length == 1 && stages.single == dummyAuthType,
-      );
-      if (!dummyOnly) {
-        throw RegisterException(l10n.registerUnsupportedAuth);
-      }
-
-      await _createAccount(client, username, password);
-
-      if (!mounted) return;
-      context.go('/backup');
-    } on MatrixException catch (exception) {
-      if (!mounted) return;
-      setState(() {
-        error = _matrixExceptionMessage(exception, context);
-        loading = false;
-      });
+      client = await _resolveClient();
     } on RegisterException catch (exception) {
       if (!mounted) return;
-      setState(() {
+      return setState(() {
         error = exception.message;
         loading = false;
       });
     } catch (exception) {
       if (!mounted) return;
-      setState(() {
-        error = exception.toString();
+      return setState(() {
+        error = 'checkHomeserver failed: $exception';
         loading = false;
       });
     }
+
+    final url = registrationUrl(client);
+    debugPrint('REGISTER URL = $url');
+
+    http.Response response;
+    try {
+      response = await http
+          .post(
+            url,
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode(<String, Object?>{
+              'username': username,
+              'password': password,
+              'auth': <String, Object?>{'type': dummyAuthType},
+              'initial_device_display_name': PlatformInfos.appDisplayName,
+              // Let the login below create the device so the account does not
+              // end up with an orphaned session, and so no access token ends up
+              // in the logs.
+              'inhibit_login': true,
+            }),
+          )
+          .timeout(requestTimeout);
+    } on TimeoutException {
+      if (!mounted) return;
+      return setState(() {
+        error = 'REGISTER timeout after ${requestTimeout.inSeconds}s\n$url';
+        loading = false;
+      });
+    } catch (exception) {
+      if (!mounted) return;
+      return setState(() {
+        error = 'REGISTER request failed\n$url\n$exception';
+        loading = false;
+      });
+    }
+
+    debugPrint('REGISTER RESP = ${response.statusCode} ${response.body}');
+
+    if (response.statusCode != 200) {
+      if (!mounted) return;
+      final l10n = L10n.of(context);
+      final hint = _hintFor(response, l10n);
+      return setState(() {
+        error = hint == null
+            ? '${response.statusCode}: ${response.body}'
+            : '$hint\n\n${response.statusCode}: ${response.body}';
+        loading = false;
+      });
+    }
+
+    String? userId;
+    try {
+      final json = jsonDecode(response.body);
+      if (json is Map) userId = json['user_id'] as String?;
+    } catch (_) {
+      // The account exists at this point, the login below will report problems.
+    }
+
+    try {
+      await client.login(
+        LoginType.mLoginPassword,
+        identifier: AuthenticationUserIdentifier(user: userId ?? username),
+        password: password,
+        initialDeviceDisplayName: PlatformInfos.appDisplayName,
+      );
+    } catch (exception) {
+      if (!mounted) return;
+      return setState(() {
+        error =
+            '账号已注册成功（${userId ?? username}），但自动登录失败：\n'
+            '${exception is MatrixException ? exception.errorMessage : exception}';
+        loading = false;
+      });
+    }
+
+    if (!mounted) return;
+    context.go('/backup');
   }
 
-  String _matrixExceptionMessage(
-    MatrixException exception,
-    BuildContext context,
-  ) {
-    final l10n = L10n.of(context);
-    switch (exception.errcode) {
+  /// A short explanation for the most common registration failures. The raw
+  /// status code and body are always appended by the caller.
+  String? _hintFor(http.Response response, L10n l10n) {
+    String? errcode;
+    try {
+      final json = jsonDecode(response.body);
+      if (json is Map) errcode = json['errcode'] as String?;
+    } catch (_) {
+      // not json, keep errcode null
+    }
+
+    if (response.statusCode == 401) return l10n.registerUnsupportedAuth;
+    if (response.statusCode == 404) {
+      return '服务器没有这个接口（404），请确认服务器地址和版本';
+    }
+
+    switch (errcode) {
       case 'M_USER_IN_USE':
         return l10n.registerUsernameTaken;
       case 'M_INVALID_USERNAME':
@@ -260,14 +293,14 @@ class RegisterController extends State<Register> {
       case 'M_WEAK_PASSWORD':
         return l10n.registerWeakPassword;
       case 'M_FORBIDDEN':
-        if (exception.requireAdditionalAuthentication) {
-          return l10n.registerUnsupportedAuth;
-        }
+      case 'M_GUEST_ACCESS_FORBIDDEN':
         return l10n.registerRegistrationDisabled;
       case 'M_LIMIT_EXCEEDED':
         return l10n.registerRateLimited;
+      case 'M_UNRECOGNIZED':
+        return '服务器不认识这个请求（M_UNRECOGNIZED），请确认服务器地址';
       default:
-        return exception.errorMessage;
+        return null;
     }
   }
 
