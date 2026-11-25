@@ -55,17 +55,22 @@
 
 ---
 
-## 三、朋友圈实现方案（纯客户端，不需要改服务器）
+## 三、朋友圈（已实现，v1）
+
+> 状态：**已经写完并编译验证**，代码在 `lib/utils/moments/` 和 `lib/pages/moments/`，
+> 详细说明见 `FORK_NOTES.md` 的「朋友圈（Moments）」一节。下面是最终采用的数据模型，
+> 和最早的草案有两处不同（标了 ✅ 已实现）。
 
 ### 数据模型
 
-- **朋友圈房间**：首次打开朋友圈时，如果自己没有就自动创建
+- **朋友圈房间**：首次发动态时自动创建
   ```
   client.createRoom(
     preset: CreateRoomPreset.privateChat,
     visibility: Visibility.private,
-    name: 'QIVchat 朋友圈 · <displayName>',
-    invite: [],            // 之后由用户手动邀请好友
+    name: '朋友圈 · <displayName>',
+    topic: 'qivchat.moments',   // 邀请（stripped state）里也能认出这是朋友圈
+    invite: [],                 // 之后由用户手动邀请好友
     initialState: [ StateEvent(
         type: 'chat.qiv.moments',
         stateKey: '',
@@ -74,25 +79,26 @@
   )
   ```
   这个自定义 state 事件就是「这是一个朋友圈房间」的标记，不需要服务器支持（普通 state 事件）。
-- **发现**：遍历 `client.rooms`，凡是带 `chat.qiv.moments` state 的房间都算朋友圈房间。
+- **发现**：遍历 `client.rooms`，带 `chat.qiv.moments` state（或 topic 是 `qivchat.moments`）的都算。
   自己的房间 = owner 是自己；好友的房间 = 别人邀请自己进去的。
-- **动态**：自定义事件 `chat.qiv.moment`
+- **动态** ✅：**普通 `m.room.message`**（不是自定义类型，兼容性最好），图片放在自定义字段里：
   ```json
-  {"body": "文字内容", "images": ["mxc://..."], "ts": 1700000000000}
+  {"msgtype": "m.text", "body": "文字内容", "qiv.moments.images": ["mxc://..."]}
   ```
-  只渲染**房间创建者**发的那种事件（防止好友在里面乱发动态）。
-- **点赞**：标准 `m.reaction`，`m.relates_to: {rel_type: "m.annotation", event_id: <动态>, key: "❤️"}`
-- **评论**：普通 `m.room.message`，带上
-  `m.relates_to: {rel_type: "m.thread", event_id: <动态>, is_falling_back: false}`
-  （用 Matrix 原生 thread，SDK 已经能解析聚合）
-- **删除**：`client.redactEvent(roomId, eventId)`（只能删自己的；房主当然也能删自己的）
-- **图片**：`client.uploadMedia(bytes, contentType)` → mxc，最多 9 张；渲染用
-  `MxcImage`/`ImageProvider`（参考 `lib/widgets/mxc_image.dart` 之类的现成组件）
+  只渲染**房间创建者**发、且不带 `m.relates_to` 的消息（这样房主在评论区回复也不会变成新动态）。
+- **点赞** ✅：标准 `m.reaction`，`m.relates_to: {rel_type: "m.annotation", event_id: <动态>, key: "❤️"}`
+- **评论** ✅：标准 `m.thread` 回复（`m.relates_to.rel_type = "m.thread"`）
+- **删除** ✅：`room.redactEvent(eventId)`（自己的动态/评论）
+- **图片** ✅：`client.uploadContent(bytes, filename:)` → mxc，最多 9 张，发布时先按 1600px 压缩
+
+**实测结论（Synapse 1.67）**：自定义 state、topic、消息自定义字段、`m.reaction`、`m.thread`、
+redact 全部可用；但 `/relations` 接口**不存在**（400），所以聚合点赞/评论是自己扫房间时间线做的。
 
 ### UI
 
-- 入口：聊天列表 AppBar 加一个图标（相机/心形），路由 `/rooms/moments`
+- 入口 ✅：聊天列表左下角相机小 FAB + 左上角头像菜单里的「朋友圈」，路由 `/moments`、`/moments/compose`
 - 页面拆三个：
+
   - `moments_moments_page`：信息流（按 `getTimeline`/`room.getTimeline` 拉，倒序，分页）
   - `moments_compose_page`：输入文字 + 选图 + 发布
   - `moments_detail_page`：单条动态 + 评论列表 + 输入框

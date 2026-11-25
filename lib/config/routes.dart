@@ -20,6 +20,8 @@ import 'package:fluffychat/pages/device_settings/device_settings.dart';
 import 'package:fluffychat/pages/intro/intro_page_presenter.dart';
 import 'package:fluffychat/pages/invitation_selection/invitation_selection.dart';
 import 'package:fluffychat/pages/login/login.dart';
+import 'package:fluffychat/pages/moments/moment_compose.dart';
+import 'package:fluffychat/pages/moments/moments.dart';
 import 'package:fluffychat/pages/new_group/new_group.dart';
 import 'package:fluffychat/pages/new_private_chat/new_private_chat.dart';
 import 'package:fluffychat/pages/register/register.dart';
@@ -118,6 +120,18 @@ abstract class AppRoutes {
       path: '/configs',
       pageBuilder: (context, state) =>
           defaultPageBuilder(context, state, const ConfigViewer()),
+    ),
+    GoRoute(
+      path: '/moments',
+      redirect: loggedOutRedirect,
+      pageBuilder: (context, state) =>
+          defaultPageBuilder(context, state, const Moments()),
+    ),
+    GoRoute(
+      path: '/moments/compose',
+      redirect: loggedOutRedirect,
+      pageBuilder: (context, state) =>
+          defaultPageBuilder(context, state, const MomentCompose()),
     ),
     GoRoute(
       path: '/backup',

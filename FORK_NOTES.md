@@ -74,6 +74,38 @@ POST → 200（body 带 "auth":{"type":"m.login.dummy"}，直接注册成功）
 
 > 顺带说明：`m.room.member` 的头像缓存（聊天记录里自己那条消息旁边的头像）不在这次修的范围内，
 > 它要等下一次成员事件或重登才会更新，不影响设置页和顶栏。
+### 朋友圈（Moments）
+
+**入口**：聊天列表左下角的相机小圆钮，或者左上角头像菜单里的「朋友圈」。
+
+**数据模型**（纯 Matrix 原生事件，不需要服务器插件）：
+
+| 概念 | 实现 |
+| --- | --- |
+| 每个人的朋友圈 | 一个私有房间：`name = "朋友圈 · <昵称>"`、`topic = "qivchat.moments"`、`preset = private_chat`，并带自定义 state `chat.qiv.moments = {version: 1}` |
+| 好友 | 被邀请进这个房间的人（用系统自带的「邀请」页，`room.invite(userId)`）；互相邀请才能互相看到 |
+| 动态 | 房主发的普通 `m.room.message`（`msgtype: m.text`），图片放在自定义字段 `qiv.moments.images: [mxc...]`（最多 9 张） |
+| 点赞 | 标准 `m.reaction`，`rel_type: m.annotation`，`key: "❤️"` |
+| 评论 | 标准 `m.thread` 回复（`m.relates_to.rel_type = m.thread`） |
+| 删除 | `room.redactEvent(eventId)`（自己的动态/评论） |
+
+**代码位置**
+
+| 文件 | 作用 |
+| --- | --- |
+| `lib/utils/moments/moments_service.dart` | 常量、房间判定/创建、发动态、点赞、评论、删除、把多个房间的时间线聚合成一条信息流 |
+| `lib/pages/moments/moments.dart` + `moments_view.dart` | 信息流页（下拉刷新、邀请卡片、九宫格图片、点赞/评论/删除） |
+| `lib/pages/moments/moment_compose.dart` + `moment_compose_view.dart` | 发布页（文字 + 最多 9 图，上传进度） |
+| `lib/pages/moments/moment_comments.dart` | 评论弹层（长按自己的评论可删） |
+| 路由 | `/moments`、`/moments/compose`（`lib/config/routes.dart`） |
+| `lib/pages/chat_list/chat_list.dart` | 聊天列表里过滤掉朋友圈房间，避免和普通聊天混在一起 |
+
+**在这台服务器（Synapse 1.67）上实测过**：自定义 state、topic 标记、消息里的自定义图片字段、
+`m.reaction`、`m.thread` 评论、redact 删除全部可用。
+注意 Synapse 1.67 **没有** `/relations` 接口（返回 400），所以 App 不查 relations，
+而是直接扫房间时间线来聚合点赞/评论——这也意味着每个朋友圈房间的时间线是本地缓存的，离线也能看。
+
+**已知限制**：目前没有「好友分组可见 / 不给谁看」，也没有视频；图片最多 9 张；时间线一次取 80 条。
 ### 图标与应用名
 
 - 应用名：`android/app/src/main/AndroidManifest.xml` 里的 `android:label="QIVchat"`

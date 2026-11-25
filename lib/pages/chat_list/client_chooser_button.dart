@@ -80,6 +80,16 @@ class _ClientChooserButtonState extends State<ClientChooserButton> {
       );
     return <PopupMenuEntry<Object>>[
       PopupMenuItem(
+        value: SettingsAction.moments,
+        child: Row(
+          children: [
+            const Icon(Icons.photo_camera_outlined),
+            const SizedBox(width: 18),
+            Text(L10n.of(context).momentsTitle),
+          ],
+        ),
+      ),
+      PopupMenuItem(
         value: SettingsAction.newGroup,
         child: Row(
           children: [
@@ -244,6 +254,10 @@ class _ClientChooserButtonState extends State<ClientChooserButton> {
       widget.controller.setActiveBundle(object);
     } else if (object is SettingsAction) {
       switch (object) {
+        case SettingsAction.moments:
+          if (!context.mounted) return;
+          context.push('/moments');
+          break;
         case SettingsAction.addAccount:
           if (!context.mounted) return;
           context.go('/rooms/settings/addaccount');
@@ -274,6 +288,7 @@ class _ClientChooserButtonState extends State<ClientChooserButton> {
 }
 
 enum SettingsAction {
+  moments,
   addAccount,
   newGroup,
   setStatus,

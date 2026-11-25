@@ -6,9 +6,11 @@
 import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/config/themes.dart';
+import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list.dart';
 import 'package:fluffychat/pages/chat_list/navigation_rail.dart';
 import 'package:fluffychat/pages/chat_list/start_chat_fab.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'chat_list_body.dart';
@@ -95,13 +97,25 @@ class ChatListView extends StatelessWidget {
                     !controller.isSearchMode &&
                         controller.activeSpaceId == null &&
                         !FluffyThemes.isColumnMode(context)
-                    ? ValueListenableBuilder(
-                        valueListenable: controller.scrolledToTop,
-                        builder: (context, scrolledToTop, _) => StartChatFab(
-                          extended:
-                              scrolledToTop &&
-                              !AppSettings.displayNavigationRail.value,
-                        ),
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          FloatingActionButton.small(
+                            heroTag: 'moments_fab',
+                            tooltip: L10n.of(context).momentsTitle,
+                            onPressed: () => context.push('/moments'),
+                            child: const Icon(Icons.photo_camera_outlined),
+                          ),
+                          const SizedBox(height: 12),
+                          ValueListenableBuilder(
+                            valueListenable: controller.scrolledToTop,
+                            builder: (context, scrolledToTop, _) => StartChatFab(
+                              extended:
+                                  scrolledToTop &&
+                                  !AppSettings.displayNavigationRail.value,
+                            ),
+                          ),
+                        ],
                       )
                     : const SizedBox.shrink(),
               ),
