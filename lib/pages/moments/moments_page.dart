@@ -67,6 +67,8 @@ class _MomentsPageState extends State<MomentsPage> {
         },
       );
       unawaited(_service.inviteMissingFriends(room));
+      // 旧封面在私有账号数据里，首次打开时迁到房间状态事件，别人才能看到。
+      unawaited(_service.migrateLegacyCover());
       unawaited(_service.markSeen());
       if (pull) {
         // 下拉刷新转圈至少 600ms

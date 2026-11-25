@@ -30,25 +30,82 @@ class MomentsService {
 
   int get lastSeenTs => (_config['last_seen_ts'] as num?)?.toInt() ?? 0;
 
-  /// 自定义封面（账号数据 com.dafeiyu.moments_cover），没有就返回 null。
-  Uri? get coverImage {
-    final image = client.accountData[coverEventType]?.content['image'];
+  /// 封面存在房间状态事件里（state_key = 用户 id），这样别人也读得到。
+  Uri? coverFor(String userId) {
+    final event = room?.states[coverEventType]?[userId];
+    final image = event?.content['image'];
     if (image is! String || image.isEmpty) return null;
     return Uri.tryParse(image);
+  }
+
+  /// 自己的封面。
+  Uri? get coverImage {
+    final userId = client.userID;
+    return userId == null ? null : coverFor(userId);
   }
 
   Future<void> setCover(Uint8List bytes) async {
     final userId = client.userID;
     if (userId == null) return;
+    final momentsRoom = await ensureRoom();
     final mxc = await client.uploadContent(
       bytes,
       filename: 'cover.jpg',
       contentType: 'image/jpeg',
     );
-    await client.setAccountData(userId, coverEventType, {
+    // 写房间状态事件：账号数据是私有的，别人读不到。
+    await client.setRoomStateWithKey(momentsRoom.id, coverEventType, userId, {
       'image': mxc.toString(),
       'updated_at': DateTime.now().millisecondsSinceEpoch,
     });
+  }
+
+  /// 旧版封面存在私有账号数据里，首次进朋友圈时迁到房间状态事件。
+  Future<void> migrateLegacyCover() async {
+    final userId = client.userID;
+    if (userId == null) return;
+    final legacy = client.accountData[coverEventType]?.content['image'];
+    if (legacy is! String || legacy.isEmpty) return;
+    if (coverFor(userId) != null) return;
+    try {
+      final momentsRoom = await ensureRoom();
+      await client.setRoomStateWithKey(momentsRoom.id, coverEventType, userId, {
+        'image': legacy,
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+      });
+      debugPrint('[moments] migrated legacy cover to room state');
+    } catch (e) {
+      debugPrint('[moments] migrate cover failed: $e');
+    }
+  }
+
+  /// 某个人的动态（共用房间里按 sender 过滤），必要时多翻几页历史。
+  Future<List<Event>> momentsBySender(
+    String userId, {
+    int minCount = 10,
+    int maxPages = 3,
+  }) async {
+    final momentsRoom = room;
+    if (momentsRoom == null) return const [];
+    final tl = await momentsRoom.getTimeline(limit: 40);
+    List<Event> mine() => momentEvents(
+      tl.events,
+    ).where((e) => e.senderId == userId).toList();
+
+    var result = mine();
+    var pages = 0;
+    while (result.length < minCount && pages < maxPages) {
+      if (!tl.canRequestHistory) break;
+      try {
+        await tl.requestHistory(historyCount: 40);
+      } catch (e) {
+        debugPrint('[moments] history failed: $e');
+        break;
+      }
+      pages++;
+      result = mine();
+    }
+    return result;
   }
 
   Room? get room {

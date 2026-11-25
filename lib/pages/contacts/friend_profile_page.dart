@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/moments/moment_image.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
+import 'package:fluffychat/utils/moments/moments_service.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
 import 'package:fluffychat/widgets/avatar.dart';
@@ -23,6 +25,53 @@ class FriendProfilePage extends StatefulWidget {
 
 class _FriendProfilePageState extends State<FriendProfilePage> {
   FriendsService get _service => FriendsService(Matrix.of(context).client);
+
+  MomentsService get _momentsService => MomentsService(Matrix.of(context).client);
+
+  List<String> _recentMomentImages = const [];
+  bool _momentsLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadMomentsPreview());
+  }
+
+  /// 资料页那一行要显示对方最近 3 张动态图。
+  Future<void> _loadMomentsPreview() async {
+    final images = <String>[];
+    try {
+      final moments = await _momentsService.momentsBySender(
+        widget.userId,
+        minCount: 3,
+        maxPages: 1,
+      );
+      for (final moment in moments) {
+        images.addAll(MomentsService.images(moment));
+        if (images.length >= 3) break;
+      }
+    } catch (e) {
+      debugPrint('[moments] preview failed: $e');
+    }
+    if (!mounted) return;
+    setState(() {
+      _recentMomentImages = images.take(3).toList();
+      _momentsLoaded = true;
+    });
+  }
+
+  Future<void> _openMoments() async {
+    if (_momentsLoaded && _recentMomentImages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(L10n.of(context).noMomentsForFriend)),
+      );
+      return;
+    }
+    await context.push(
+      '/moments/friend?userId=${Uri.encodeComponent(widget.userId)}',
+    );
+    if (mounted) await _loadMomentsPreview();
+  }
 
   Future<void> _sendMessage() async {
     try {
@@ -104,6 +153,32 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
               ),
             ),
           const SizedBox(height: 24),
+          ListTile(
+            leading: const Icon(Icons.grid_view_outlined),
+            title: Text(l10n.moments),
+            subtitle: _momentsLoaded && _recentMomentImages.isEmpty
+                ? Text(l10n.noMomentsShort)
+                : null,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final image in _recentMomentImages)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: MomentImage(
+                        uri: Uri.tryParse(image),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                const Icon(Icons.chevron_right_outlined),
+              ],
+            ),
+            onTap: _openMoments,
+          ),
           ListTile(
             leading: const Icon(Icons.chat_bubble_outline),
             title: Text(l10n.sendMessage),

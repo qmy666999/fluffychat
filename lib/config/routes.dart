@@ -25,6 +25,7 @@ import 'package:fluffychat/pages/discover/discover_page.dart';
 import 'package:fluffychat/pages/intro/intro_page_presenter.dart';
 import 'package:fluffychat/pages/invitation_selection/invitation_selection.dart';
 import 'package:fluffychat/pages/login/login.dart';
+import 'package:fluffychat/pages/moments/friend_moments_page.dart';
 import 'package:fluffychat/pages/moments/moment_composer_page.dart';
 import 'package:fluffychat/pages/moments/moments_page.dart';
 import 'package:fluffychat/pages/new_group/new_group.dart';
@@ -153,6 +154,16 @@ abstract class AppRoutes {
           path: 'compose',
           pageBuilder: (context, state) =>
               defaultPageBuilder(context, state, const MomentComposerPage()),
+        ),
+        GoRoute(
+          path: 'friend',
+          pageBuilder: (context, state) => defaultPageBuilder(
+            context,
+            state,
+            FriendMomentsPage(
+              userId: state.uri.queryParameters['userId'] ?? '',
+            ),
+          ),
         ),
       ],
     ),
