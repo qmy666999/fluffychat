@@ -2864,6 +2864,7 @@
     },
     "registerUsernameHint": "小写字母、数字，可含 . _ = -",
     "registerUsername": "用户名",
+    "avatarUnsupportedFormat": "不支持的图片格式，请换一张 JPEG 或 PNG。",
     "confirmPassword": "确认密码",
     "register": "注册",
     "registerPasswordTooShort": "密码太短（至少 8 位）",

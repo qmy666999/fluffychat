@@ -4,11 +4,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/utils/avatar_image.dart';
 import 'package:fluffychat/utils/file_selector.dart';
+import 'package:fluffychat/utils/refresh_own_profile.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -61,8 +64,15 @@ class SettingsController extends State<Settings> {
       ),
     );
     if (success.error == null) {
+      await _refreshProfile();
+      if (!mounted) return;
       updateProfile();
     }
+  }
+
+  /// 改完资料必须强刷一次缓存，否则界面读到的还是旧值（见 refresh_own_profile.dart）。
+  Future<void> _refreshProfile() async {
+    await refreshOwnProfile(Matrix.of(context).client);
   }
 
   Future<void> logoutAction() async {
@@ -95,6 +105,8 @@ class SettingsController extends State<Settings> {
         future: () => matrix.client.setAvatar(null),
       );
       if (success.error == null) {
+        await _refreshProfile();
+        if (!mounted) return;
         updateProfile();
       }
       return;
@@ -103,15 +115,26 @@ class SettingsController extends State<Settings> {
     if (action == AvatarAction.camera) {
       final result = await ImagePicker().pickImage(source: ImageSource.camera);
       if (result == null) return;
-      file = MatrixFile(bytes: await result.readAsBytes(), name: result.path);
+      final avatarBytes = await _prepareAvatar(await result.readAsBytes());
+      if (avatarBytes == null) return;
+      file = MatrixFile(
+        bytes: avatarBytes,
+        name: 'avatar.jpg',
+        mimeType: 'image/jpeg',
+      );
     } else {
       if (!mounted) return;
       final result = await selectFiles(context, type: FileType.image);
       final pickedFile = result.firstOrNull;
       if (pickedFile == null) return;
+      final avatarBytes = await _prepareAvatar(
+        await pickedFile.readAsBytes(),
+      );
+      if (avatarBytes == null) return;
       file = MatrixFile(
-        bytes: await pickedFile.readAsBytes(),
-        name: pickedFile.name,
+        bytes: avatarBytes,
+        name: 'avatar.jpg',
+        mimeType: 'image/jpeg',
       );
     }
     if (!mounted) return;
@@ -120,7 +143,23 @@ class SettingsController extends State<Settings> {
       future: () => matrix.client.setAvatar(file),
     );
     if (success.error == null) {
+      await _refreshProfile();
+      if (!mounted) return;
       updateProfile();
+    }
+  }
+
+  /// 头像上传前统一转 JPEG（最长边 512）：相册里的 HEIC 直接传会让服务器
+  /// 生成不了缩略图，头像变灰。解不开的格式在这里提示，不静默上传坏文件。
+  Future<Uint8List?> _prepareAvatar(Uint8List bytes) async {
+    try {
+      return prepareAvatarBytes(bytes);
+    } on UnsupportedAvatarFormat {
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(L10n.of(context).avatarUnsupportedFormat)),
+      );
+      return null;
     }
   }
 
