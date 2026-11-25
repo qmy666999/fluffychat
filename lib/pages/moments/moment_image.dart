@@ -23,6 +23,10 @@ class MomentImage extends StatefulWidget {
   final BorderRadius? borderRadius;
   final Widget? placeholder;
 
+  /// true = 直接取原图（封面、点开的大图）；
+  /// false = 按显示尺寸取缩略图（列表九宫格）。
+  final bool original;
+
   const MomentImage({
     required this.uri,
     this.width,
@@ -30,6 +34,7 @@ class MomentImage extends StatefulWidget {
     this.fit = BoxFit.cover,
     this.borderRadius,
     this.placeholder,
+    this.original = false,
     super.key,
   });
 
@@ -68,13 +73,19 @@ class _MomentImageState extends State<MomentImage> {
       final data = await client
           .downloadMxcCached(
             uri,
-            // 缩略图必须带尺寸，否则服务器/客户端都可能拼出无效请求。
-            width: widget.width == null ? 640 : widget.width! * 2,
-            height: widget.height == null ? 640 : widget.height! * 2,
-            isThumbnail: true,
+            // 缩略图必须带尺寸，否则请求本身就是无效的。
+            // 尺寸 ×2 是为了适配高 DPI 屏幕；服务器开了动态缩略图后
+            // 会按这个尺寸现场生成，不会再拿 96px 拉伸。
+            width: widget.original
+                ? null
+                : (widget.width ?? 240) * 2,
+            height: widget.original
+                ? null
+                : (widget.height ?? 240) * 2,
+            isThumbnail: !widget.original,
             thumbnailMethod: ThumbnailMethod.crop,
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(Duration(seconds: widget.original ? 20 : 10));
       if (!mounted) return;
       setState(() {
         _data = data;

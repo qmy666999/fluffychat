@@ -303,7 +303,8 @@ class _MomentsPageState extends State<MomentsPage> {
           fit: StackFit.expand,
           children: [
             if (cover != null)
-              MomentImage(uri: cover, fit: BoxFit.cover)
+              // 封面整屏宽，直接要原图（一张几百 KB，可接受）。
+              MomentImage(uri: cover, fit: BoxFit.cover, original: true)
             else
               // 默认封面：主题色渐变 + 相机图标，别用纯色块。
               DecoratedBox(

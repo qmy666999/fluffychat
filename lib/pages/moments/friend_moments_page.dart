@@ -135,7 +135,12 @@ class _FriendMomentsPageState extends State<FriendMomentsPage> {
                 onOpenImage: (uri) => showDialog(
                   context: context,
                   builder: (_) => Dialog(
-                    child: MomentImage(uri: uri, fit: BoxFit.contain),
+                    // 点开看大图：要原图
+                    child: MomentImage(
+                      uri: uri,
+                      fit: BoxFit.contain,
+                      original: true,
+                    ),
                   ),
                 ),
               ),
@@ -161,7 +166,7 @@ class _Cover extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         if (cover != null)
-          MomentImage(uri: cover, fit: BoxFit.cover)
+          MomentImage(uri: cover, fit: BoxFit.cover, original: true)
         else
           DecoratedBox(
             decoration: BoxDecoration(
