@@ -16,6 +16,10 @@ import 'package:fluffychat/pages/chat_list/chat_list.dart';
 import 'package:fluffychat/pages/chat_members/chat_members.dart';
 import 'package:fluffychat/pages/chat_permissions_settings/chat_permissions_settings.dart';
 import 'package:fluffychat/pages/chat_search/chat_search_page.dart';
+import 'package:fluffychat/pages/contacts/add_friend_page.dart';
+import 'package:fluffychat/pages/contacts/contacts_page.dart';
+import 'package:fluffychat/pages/contacts/friend_profile_page.dart';
+import 'package:fluffychat/pages/contacts/new_friends_page.dart';
 import 'package:fluffychat/pages/device_settings/device_settings.dart';
 import 'package:fluffychat/pages/intro/intro_page_presenter.dart';
 import 'package:fluffychat/pages/invitation_selection/invitation_selection.dart';
@@ -107,11 +111,30 @@ abstract class AppRoutes {
     ),
     GoRoute(
       path: '/contacts',
-      pageBuilder: (context, state) => defaultPageBuilder(
-        context,
-        state,
-        const PlaceholderPage(kind: PlaceholderKind.contacts),
-      ),
+      pageBuilder: (context, state) =>
+          defaultPageBuilder(context, state, const ContactsPage()),
+      routes: [
+        GoRoute(
+          path: 'add',
+          pageBuilder: (context, state) =>
+              defaultPageBuilder(context, state, const AddFriendPage()),
+        ),
+        GoRoute(
+          path: 'new',
+          pageBuilder: (context, state) =>
+              defaultPageBuilder(context, state, const NewFriendsPage()),
+        ),
+        GoRoute(
+          path: 'friend',
+          pageBuilder: (context, state) => defaultPageBuilder(
+            context,
+            state,
+            FriendProfilePage(
+              userId: state.uri.queryParameters['userId'] ?? '',
+            ),
+          ),
+        ),
+      ],
     ),
     GoRoute(
       path: '/discover',

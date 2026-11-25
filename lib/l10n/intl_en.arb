@@ -2893,6 +2893,51 @@
     "changeServer": "Change server",
     "serverAddress": "Server address",
     "pleaseEnterYourHomeserver": "Please enter the server address",
+    "newFriends": "New friends",
+    "friendsSection": "Friends",
+    "addToContacts": "Add to contacts",
+    "alreadyFriend": "Added",
+    "requestVerificationMessage": "Verification message",
+    "friendRequestDefaultMessage": "Hi, I'm {name}",
+    "@friendRequestDefaultMessage": {
+        "placeholders": {
+            "name": {
+                "type": "String"
+            }
+        }
+    },
+    "friendRequestSent": "Friend request sent",
+    "friendRequestFailed": "Friend request failed: {error}",
+    "@friendRequestFailed": {
+        "placeholders": {
+            "error": {
+                "type": "String"
+            }
+        }
+    },
+    "noFriendsYet": "Your contacts are empty. Tap + in the top right to add someone.",
+    "noUserFound": "No user found. Matrix has no phone-number search, use a username or full Matrix ID.",
+    "searchUsersHint": "Enter a username or Matrix ID",
+    "incomingRequests": "Received",
+    "outgoingRequests": "Sent",
+    "noRequests": "Nothing here yet",
+    "waitingVerification": "Waiting",
+    "statusAccepted": "Accepted",
+    "statusRejected": "Rejected",
+    "friendProfile": "Profile",
+    "sendMessage": "Send message",
+    "setRemark": "Set remark",
+    "remarkHint": "Remark",
+    "removeFriend": "Remove friend",
+    "removeFriendConfirm": "Remove this friend? Both contact lists will drop each other.",
+    "openChatFailed": "Could not open the chat: {error}",
+    "@openChatFailed": {
+        "placeholders": {
+            "error": {
+                "type": "String"
+            }
+        }
+    },
     "senderMessage": "{sender}: {message}",
     "@senderMessage": {
         "placeholders": {

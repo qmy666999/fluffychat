@@ -5,6 +5,7 @@
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list.dart';
 import 'package:fluffychat/pages/chat_list/client_chooser_button.dart';
+import 'package:fluffychat/utils/friends/friends_service.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
@@ -63,7 +64,17 @@ class ChatListBottomBar extends StatelessWidget {
                   label: L10n.of(context).bottomTabContacts,
                   selected: false,
                   onTap: () => context.push('/contacts'),
-                  icon: const Icon(Icons.contacts_outlined),
+                  icon: StreamBuilder(
+                    stream: client.onSync.stream,
+                    builder: (context, _) {
+                      final pending = FriendsService(client).load().pendingCount;
+                      return Badge(
+                        isLabelVisible: pending > 0,
+                        label: Text(pending > 99 ? '99+' : pending.toString()),
+                        child: const Icon(Icons.contacts_outlined),
+                      );
+                    },
+                  ),
                 ),
               ),
               Expanded(

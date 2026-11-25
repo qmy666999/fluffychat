@@ -2893,6 +2893,51 @@
     "changeServer": "更换服务器",
     "serverAddress": "服务器地址",
     "pleaseEnterYourHomeserver": "请填写服务器地址",
+    "newFriends": "新的朋友",
+    "friendsSection": "好友",
+    "addToContacts": "添加到通讯录",
+    "alreadyFriend": "已添加",
+    "requestVerificationMessage": "验证消息",
+    "friendRequestDefaultMessage": "我是 {name}",
+    "@friendRequestDefaultMessage": {
+        "placeholders": {
+            "name": {
+                "type": "String"
+            }
+        }
+    },
+    "friendRequestSent": "好友申请已发送",
+    "friendRequestFailed": "好友申请失败：{error}",
+    "@friendRequestFailed": {
+        "placeholders": {
+            "error": {
+                "type": "String"
+            }
+        }
+    },
+    "noFriendsYet": "通讯录还是空的，点右上角「+」添加朋友。",
+    "noUserFound": "没搜到用户。Matrix 不支持手机号搜索，请用用户名或完整 ID。",
+    "searchUsersHint": "输入用户名或 Matrix ID",
+    "incomingRequests": "收到的申请",
+    "outgoingRequests": "已发送的申请",
+    "noRequests": "还没有申请",
+    "waitingVerification": "等待验证",
+    "statusAccepted": "已接受",
+    "statusRejected": "已拒绝",
+    "friendProfile": "好友资料",
+    "sendMessage": "发消息",
+    "setRemark": "设置备注",
+    "remarkHint": "备注名",
+    "removeFriend": "删除好友",
+    "removeFriendConfirm": "确定删除这个好友？双方名单都会移除。",
+    "openChatFailed": "打开会话失败：{error}",
+    "@openChatFailed": {
+        "placeholders": {
+            "error": {
+                "type": "String"
+            }
+        }
+    },
     "senderHasInvitedYouToTheSpace": "{sender} 已邀请你到 '{nameOrAlias}'空间。",
     "@senderHasInvitedYouToTheSpace": {
         "placeholders": {
