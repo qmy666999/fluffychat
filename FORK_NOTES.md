@@ -80,6 +80,12 @@ flutter build apk --release --target-platform android-arm64
 产物：`build\app\outputs\flutter-apk\app-release.apk`（约 100 MB，
 只带 arm64 的 Dart 本体；装到 arm64 手机上即可）
 
+构建好的包已经另存一份在：
+`<workspace>\release\FluffyChat-register-2.11.6-arm64.apk`
+
+> `pubspec.lock` 保持上游版本没有提交改动，本机 `flutter pub get` 会重新解析
+> （版本会比上游锁文件略新，属于正常现象，`git status` 里看到它变化不用管）。
+
 ---
 
 ## 3. 国内网络：构建时踩过的三个坑
