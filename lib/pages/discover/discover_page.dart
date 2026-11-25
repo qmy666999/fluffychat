@@ -5,6 +5,7 @@
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list_bottom_bar.dart';
 import 'package:fluffychat/utils/moments/moments_service.dart';
+import 'package:fluffychat/utils/scan_flow.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -44,7 +45,6 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final l10n = L10n.of(context);
     return Scaffold(
       appBar: AppBar(
@@ -57,46 +57,71 @@ class _DiscoverPageState extends State<DiscoverPage> {
       bottomNavigationBar: const ChatListBottomBar(currentIndex: 2),
       body: ListView(
         children: [
-          SizedBox(
-            height: 72,
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.photo_camera_outlined,
-                  size: 22,
-                  color: theme.colorScheme.onPrimary,
-                ),
-              ),
-              title: Text(l10n.moments),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_hasNew)
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.error,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.chevron_right_outlined),
-                ],
-              ),
-              onTap: _openMoments,
-            ),
+          _DiscoverRow(
+            icon: Icons.photo_camera_outlined,
+            label: l10n.moments,
+            showDot: _hasNew,
+            onTap: _openMoments,
           ),
-          // 分割线从头像右侧开始（16 + 40 + 16 = 72）
-          const Divider(height: 1, indent: 72),
+          _DiscoverRow(
+            icon: Icons.qr_code_scanner,
+            label: l10n.scan,
+            onTap: () => startMatrixScan(context),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// 发现页的一行：40×40 彩色圆角图标 + 名称 + 可选红点。
+class _DiscoverRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool showDot;
+  final VoidCallback onTap;
+
+  const _DiscoverRow({
+    required this.icon,
+    required this.label,
+    this.showDot = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      height: 72,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 22, color: theme.colorScheme.onPrimary),
+        ),
+        title: Text(label),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showDot)
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.error,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right_outlined),
+          ],
+        ),
+        onTap: onTap,
       ),
     );
   }

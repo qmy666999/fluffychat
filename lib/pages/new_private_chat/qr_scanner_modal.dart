@@ -72,8 +72,8 @@ class QrScannerModalState extends State<QrScannerModal> {
     sub = controller.scannedDataStream.listen((scanData) {
       sub.cancel();
       if (!mounted) return;
-      Navigator.of(context).pop();
       final data = scanData.code;
+      Navigator.of(context).pop(data);
       if (data != null) widget.onScan(data);
     });
   }

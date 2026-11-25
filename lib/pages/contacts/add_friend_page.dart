@@ -4,6 +4,7 @@
 
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
+import 'package:fluffychat/utils/scan_flow.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
@@ -12,7 +13,10 @@ import 'package:matrix/matrix.dart';
 
 /// 添加朋友：按用户名 / Matrix ID 搜索（Matrix 没有手机号目录）。
 class AddFriendPage extends StatefulWidget {
-  const AddFriendPage({super.key});
+  /// 扫码带过来的查询（会自动搜索）。
+  final String? initialQuery;
+
+  const AddFriendPage({this.initialQuery, super.key});
 
   @override
   State<AddFriendPage> createState() => _AddFriendPageState();
@@ -25,6 +29,16 @@ class _AddFriendPageState extends State<AddFriendPage> {
   String? _error;
 
   FriendsService get _service => FriendsService(Matrix.of(context).client);
+
+  @override
+  void initState() {
+    super.initState();
+    final query = widget.initialQuery;
+    if (query != null && query.trim().isNotEmpty) {
+      _controller.text = query.trim();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _search());
+    }
+  }
 
   @override
   void dispose() {
@@ -88,7 +102,21 @@ class _AddFriendPageState extends State<AddFriendPage> {
     final results = _results;
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.addToContacts)),
+      appBar: AppBar(
+        title: Text(l10n.addToContacts),
+        actions: [
+          IconButton(
+            tooltip: l10n.scan,
+            icon: const Icon(Icons.qr_code_scanner),
+            onPressed: () async {
+              final query = _controller.text.trim();
+              await startMatrixScan(context);
+              // 扫码回来如果是用户 ID，会跳到本页并带 q；直接扫后手动搜索
+              if (query.isEmpty && mounted) setState(() {});
+            },
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Padding(

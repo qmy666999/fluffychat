@@ -141,11 +141,18 @@ class ChatView extends StatelessWidget {
                       onPressed: controller.copyEventsAction,
                     ),
                     if (controller.canRedactSelectedEvents)
-                      IconButton(
-                        icon: const Icon(Icons.delete_outlined),
-                        tooltip: L10n.of(context).redactMessage,
-                        onPressed: controller.redactEventsAction,
-                      ),
+                      if (controller.selectedEvents.length == 1)
+                        // 单条消息直接给文字按钮，比图标更容易看懂是「撤回」
+                        TextButton(
+                          onPressed: controller.redactEventsAction,
+                          child: Text(L10n.of(context).redactMessage),
+                        )
+                      else
+                        IconButton(
+                          icon: const Icon(Icons.delete_outlined),
+                          tooltip: L10n.of(context).redactMessage,
+                          onPressed: controller.redactEventsAction,
+                        ),
                     if (controller.selectedEvents.length == 1)
                       PopupMenuButton<_EventContextAction>(
                         useRootNavigator: true,

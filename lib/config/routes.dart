@@ -120,8 +120,13 @@ abstract class AppRoutes {
       routes: [
         GoRoute(
           path: 'add',
-          pageBuilder: (context, state) =>
-              defaultPageBuilder(context, state, const AddFriendPage()),
+          pageBuilder: (context, state) => defaultPageBuilder(
+            context,
+            state,
+            AddFriendPage(
+              initialQuery: state.uri.queryParameters['q'],
+            ),
+          ),
         ),
         GoRoute(
           path: 'new',

@@ -2900,6 +2900,16 @@
     "momentsPublish": "发表",
     "momentsEmpty": "还没有动态，点右上角相机发一条",
     "momentsNoMore": "没有更多了",
+    "scan": "扫一扫",
+    "scanInvalidQr": "这不是一个有效的 Matrix 二维码",
+    "scanJoinFailed": "进入失败：{error}",
+    "@scanJoinFailed": {
+        "placeholders": {
+            "error": {
+                "type": "String"
+            }
+        }
+    },
     "noMomentsShort": "暂无朋友圈",
     "noMomentsForFriend": "TA 还没发过动态",
     "today": "今天",
