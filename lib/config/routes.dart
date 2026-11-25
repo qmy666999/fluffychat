@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
+// SPDX-FileCopyrightText: 2019-Present Christian Ku閼寸郸wski
 // SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -21,12 +21,14 @@ import 'package:fluffychat/pages/contacts/contacts_page.dart';
 import 'package:fluffychat/pages/contacts/friend_profile_page.dart';
 import 'package:fluffychat/pages/contacts/new_friends_page.dart';
 import 'package:fluffychat/pages/device_settings/device_settings.dart';
+import 'package:fluffychat/pages/discover/discover_page.dart';
 import 'package:fluffychat/pages/intro/intro_page_presenter.dart';
 import 'package:fluffychat/pages/invitation_selection/invitation_selection.dart';
 import 'package:fluffychat/pages/login/login.dart';
+import 'package:fluffychat/pages/moments/moment_composer_page.dart';
+import 'package:fluffychat/pages/moments/moments_page.dart';
 import 'package:fluffychat/pages/new_group/new_group.dart';
 import 'package:fluffychat/pages/new_private_chat/new_private_chat.dart';
-import 'package:fluffychat/pages/placeholder/placeholder_page.dart';
 import 'package:fluffychat/pages/register/register.dart';
 import 'package:fluffychat/pages/settings/settings.dart';
 import 'package:fluffychat/pages/settings_3pid/settings_3pid.dart';
@@ -138,11 +140,21 @@ abstract class AppRoutes {
     ),
     GoRoute(
       path: '/discover',
-      pageBuilder: (context, state) => defaultPageBuilder(
-        context,
-        state,
-        const PlaceholderPage(kind: PlaceholderKind.discover),
-      ),
+      pageBuilder: (context, state) =>
+          defaultPageBuilder(context, state, const DiscoverPage()),
+    ),
+    // 闁哄牆顑呭鎼佸捶閸剛绐楅柛蹇嬪妼閻棙銇勯悽鍛婃〃闁挎稑鏈弲鐘诲箛韫囧海鐟濋柡鈧幆褏淇洪梺顔哄妼椤曢亶鎳滈搴ｇ閻庣懓鍟Σ鍛婄鎼粹€崇岛闁绘粈鍗抽妴澶愭倷绾懐绠婚柡澶堝劤濞堟垹鈧稒鍔欓妴澶愭椤喚绀嗛柕?
+    GoRoute(
+      path: '/moments',
+      pageBuilder: (context, state) =>
+          defaultPageBuilder(context, state, const MomentsPage()),
+      routes: [
+        GoRoute(
+          path: 'compose',
+          pageBuilder: (context, state) =>
+              defaultPageBuilder(context, state, const MomentComposerPage()),
+        ),
+      ],
     ),
     GoRoute(
       path: '/logs',
@@ -352,8 +364,8 @@ abstract class AppRoutes {
                           ),
                           redirect: loggedOutRedirect,
                         ),
-                        // 「添加账户」这条入口也要能进应用内注册页，
-                        // 否则和 /rooms/settings/login 是同一类缺路由的错误。
+                        // 闁靛棗鏈崸濠囧礉閻樺搫顦╅柟瀛樼仛閳ь剙绉风换鏍级閳ュ啿寮抽柛娆欑导缁″啰鎲版担钘夊幋閺夆晜绋戠花鏌ユ偨閵娿儱鏁舵繛澶堝妼閸炶姤銇勭喊澶岀
+                        // 闁告熬绠戦崹顖炲椽?/rooms/settings/login 闁哄嫷鍨伴幃鎾寸▔閳ь剛鐚鹃懡銈呯箒閻犱警鍨抽弫閬嶆儍閸曨垱鏅╅悹鍥跺灛閳?
                         GoRoute(
                           path: 'register',
                           pageBuilder: (context, state) => defaultPageBuilder(

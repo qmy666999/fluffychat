@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
+// SPDX-FileCopyrightText: 2019-Present Christian Ku脽owski
 // SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -17,6 +17,7 @@ import 'package:fluffychat/utils/error_reporter.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
+import 'package:fluffychat/utils/moments/moments_service.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/show_scaffold_dialog.dart';
 import 'package:fluffychat/utils/show_update_snackbar.dart';
@@ -166,9 +167,15 @@ class ChatListController extends State<ChatList>
     }
   }
 
-  List<Room> get filteredRooms => Matrix.of(
-    context,
-  ).client.rooms.where(getRoomFilterByActiveFilter(activeFilter)).toList();
+  List<Room> get filteredRooms {
+    final client = Matrix.of(context).client;
+    // 鏈嬪弸鍦堟埧闂村彧鍦ㄣ€屽彂鐜?鈫?鏈嬪弸鍦堛€嶉噷鍑虹幇锛屼笉杩涗細璇濆垪琛ㄣ€?
+    final momentsRoomId = MomentsService(client).roomId;
+    return client.rooms
+        .where(getRoomFilterByActiveFilter(activeFilter))
+        .where((room) => room.id != momentsRoomId)
+        .toList();
+  }
 
   bool isSearchMode = false;
   Future<QueryPublicRoomsResponse>? publicRoomsResponse;
@@ -432,7 +439,7 @@ class ChatListController extends State<ChatList>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      // 好友系统：补历史私聊的 m.direct 映射 + 开始收申请/接受/删除事件。
+      // 濂藉弸绯荤粺锛氳ˉ鍘嗗彶绉佽亰鐨?m.direct 鏄犲皠 + 寮€濮嬫敹鐢宠/鎺ュ彈/鍒犻櫎浜嬩欢銆?
       FriendsSync.start(Matrix.of(context).client);
       if (widget.activeSpace != null) {
         setActiveSpace(widget.activeSpace!);
@@ -467,8 +474,8 @@ class ChatListController extends State<ChatList>
         )
         .listen(_updateRoomTags);
 
-    // 顶部筛选标签整排已经移除（见 chat_list_body.dart），没有切换入口了，
-    // 所以这里固定成「全部」，避免之前存下的未读/群组/标签筛选把人卡住。
+    // 椤堕儴绛涢€夋爣绛炬暣鎺掑凡缁忕Щ闄わ紙瑙?chat_list_body.dart锛夛紝娌℃湁鍒囨崲鍏ュ彛浜嗭紝
+    // 鎵€浠ヨ繖閲屽浐瀹氭垚銆屽叏閮ㄣ€嶏紝閬垮厤涔嬪墠瀛樹笅鐨勬湭璇?缇ょ粍/鏍囩绛涢€夋妸浜哄崱浣忋€?
     activeFilter = ActiveFilter.allChats;
     activeTag = null;
 

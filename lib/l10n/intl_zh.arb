@@ -2895,6 +2895,41 @@
     "pleaseEnterYourHomeserver": "请填写服务器地址",
     "encryptNewChats": "新建聊天默认加密",
     "encryptNewChatsDescription": "默认关闭：关掉后机器人能读消息、换设备也不丢历史；打开则更私密，但换设备后加密期间的历史消息无法恢复。",
+    "moments": "朋友圈",
+    "momentsComposerHint": "这一刻的想法…",
+    "momentsPublish": "发表",
+    "momentsEmpty": "还没有动态，点右上角相机发一条",
+    "momentsDelete": "删除",
+    "momentsDeleteConfirm": "确定删除这条动态？",
+    "momentsLike": "赞",
+    "momentsComment": "评论",
+    "momentsCommentHint": "说点什么…",
+    "timeJustNow": "刚刚",
+    "timeMinutesAgo": "{n}分钟前",
+    "@timeMinutesAgo": {
+        "placeholders": {
+            "n": {
+                "type": "int"
+            }
+        }
+    },
+    "timeHoursAgo": "{n}小时前",
+    "@timeHoursAgo": {
+        "placeholders": {
+            "n": {
+                "type": "int"
+            }
+        }
+    },
+    "timeYesterday": "昨天",
+    "timeDaysAgo": "{n}天前",
+    "@timeDaysAgo": {
+        "placeholders": {
+            "n": {
+                "type": "int"
+            }
+        }
+    },
     "newFriends": "新的朋友",
     "friendsSection": "好友",
     "addToContacts": "添加到通讯录",

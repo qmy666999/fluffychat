@@ -2895,6 +2895,41 @@
     "pleaseEnterYourHomeserver": "Please enter the server address",
     "encryptNewChats": "Encrypt new chats by default",
     "encryptNewChatsDescription": "Off by default: bots can read plaintext messages and history survives reinstalling. Turning it on keeps messages private but encrypted history is lost when you switch devices.",
+    "moments": "Moments",
+    "momentsComposerHint": "Share a thought…",
+    "momentsPublish": "Post",
+    "momentsEmpty": "No moments yet. Tap the camera in the top right to post one.",
+    "momentsDelete": "Delete",
+    "momentsDeleteConfirm": "Delete this moment?",
+    "momentsLike": "Like",
+    "momentsComment": "Comment",
+    "momentsCommentHint": "Say something…",
+    "timeJustNow": "Just now",
+    "timeMinutesAgo": "{n}m ago",
+    "@timeMinutesAgo": {
+        "placeholders": {
+            "n": {
+                "type": "int"
+            }
+        }
+    },
+    "timeHoursAgo": "{n}h ago",
+    "@timeHoursAgo": {
+        "placeholders": {
+            "n": {
+                "type": "int"
+            }
+        }
+    },
+    "timeYesterday": "Yesterday",
+    "timeDaysAgo": "{n}d ago",
+    "@timeDaysAgo": {
+        "placeholders": {
+            "n": {
+                "type": "int"
+            }
+        }
+    },
     "newFriends": "New friends",
     "friendsSection": "Friends",
     "addToContacts": "Add to contacts",
