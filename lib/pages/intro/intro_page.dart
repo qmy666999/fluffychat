@@ -16,7 +16,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 class IntroPage extends StatelessWidget {
   final bool isLoading, hasPresetHomeserver;
   final String? loggingInToHomeserver, welcomeText;
-  final VoidCallback login;
+  final VoidCallback login, register;
 
   const IntroPage({
     required this.isLoading,
@@ -25,6 +25,7 @@ class IntroPage extends StatelessWidget {
     required this.hasPresetHomeserver,
     required this.welcomeText,
     required this.login,
+    required this.register,
   });
 
   @override
@@ -144,7 +145,18 @@ class IntroPage extends StatelessWidget {
                               mainAxisSize: .min,
                               crossAxisAlignment: .stretch,
                               children: [
-                                if (!hasPresetHomeserver)
+                                if (hasPresetHomeserver)
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          theme.colorScheme.primary,
+                                      foregroundColor:
+                                          theme.colorScheme.onPrimary,
+                                    ),
+                                    onPressed: register,
+                                    child: Text(L10n.of(context).register),
+                                  )
+                                else
                                   ElevatedButton(
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor:
@@ -180,6 +192,14 @@ class IntroPage extends StatelessWidget {
                                     child: Text(
                                       L10n.of(context).loginWithMatrixId,
                                     ),
+                                  ),
+                                // 预设服务器只是默认值，切换入口必须一直在。
+                                if (hasPresetHomeserver)
+                                  TextButton(
+                                    onPressed: () => context.go(
+                                      '${GoRouterState.of(context).uri.path}/sign_in',
+                                    ),
+                                    child: Text(L10n.of(context).changeServer),
                                   ),
                               ],
                             ),

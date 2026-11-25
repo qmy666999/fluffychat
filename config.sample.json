@@ -1,7 +1,7 @@
 {
-  "applicationName": "FluffyChat",
-  "defaultHomeserver": "matrix.org",
-  "presetHomeserver": "",
+  "applicationName": "FluffyChatX",
+  "defaultHomeserver": "qmypc.tail7337aa.ts.net",
+  "presetHomeserver": "qmypc.tail7337aa.ts.net",
   "welcomeText": "",
   "privacyUrl": "https://github.com/krille-chan/fluffychat/blob/main/PRIVACY.md",
   "audioRecordingNumChannels": 1,

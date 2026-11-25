@@ -113,6 +113,16 @@ class _IntroPagePresenterState extends State<IntroPagePresenter> {
     );
   }
 
+  /// 有预设服务器时首屏「注册」直达应用内注册页（服务器已预填）；
+  /// 没有预设时退回到原来的选服务器流程。
+  void _register() {
+    if (AppSettings.presetHomeserver.value.isEmpty) {
+      context.go('${GoRouterState.of(context).uri.path}/sign_up');
+      return;
+    }
+    context.go('${GoRouterState.of(context).uri.path}/register');
+  }
+
   @override
   Widget build(BuildContext context) {
     return IntroPage(
@@ -123,6 +133,7 @@ class _IntroPagePresenterState extends State<IntroPagePresenter> {
           ? null
           : AppSettings.welcomeText.value,
       login: _login,
+      register: _register,
     );
   }
 }

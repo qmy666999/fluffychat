@@ -2853,6 +2853,40 @@
             }
         }
     },
+    "registerAccountTitle": "Create account",
+    "registerAccountSubtitle": "Pick a username and password for {server}",
+    "@registerAccountSubtitle": {
+        "placeholders": {
+            "server": {
+                "type": "String"
+            }
+        }
+    },
+    "registerUsernameHint": "lowercase letters, digits, may contain . _ = -",
+    "registerUsername": "Username",
+    "confirmPassword": "Confirm password",
+    "register": "Register",
+    "registerPasswordTooShort": "Password is too short (at least 8 characters)",
+    "registerServerDoesNotSupport": "This server does not allow registration. Try another server or ask the admin to enable it.",
+    "registerUiaUnsupported": "This server requires an extra verification step ({stages}) that this app cannot complete automatically yet.",
+    "@registerUiaUnsupported": {
+        "placeholders": {
+            "stages": {
+                "type": "String"
+            }
+        }
+    },
+    "registerFailed": "Registration failed: {error}",
+    "@registerFailed": {
+        "placeholders": {
+            "error": {
+                "type": "String"
+            }
+        }
+    },
+    "changeServer": "Change server",
+    "serverAddress": "Server address",
+    "pleaseEnterYourHomeserver": "Please enter the server address",
     "senderMessage": "{sender}: {message}",
     "@senderMessage": {
         "placeholders": {

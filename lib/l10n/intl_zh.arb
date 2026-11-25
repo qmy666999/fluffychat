@@ -2853,6 +2853,40 @@
             }
         }
     },
+    "registerAccountTitle": "注册账号",
+    "registerAccountSubtitle": "为 {server} 设置用户名和密码",
+    "@registerAccountSubtitle": {
+        "placeholders": {
+            "server": {
+                "type": "String"
+            }
+        }
+    },
+    "registerUsernameHint": "小写字母、数字，可含 . _ = -",
+    "registerUsername": "用户名",
+    "confirmPassword": "确认密码",
+    "register": "注册",
+    "registerPasswordTooShort": "密码太短（至少 8 位）",
+    "registerServerDoesNotSupport": "这台服务器不允许注册。换一台服务器，或让管理员打开注册功能。",
+    "registerUiaUnsupported": "服务器要求额外验证（{stages}），当前版本还不能自动完成。",
+    "@registerUiaUnsupported": {
+        "placeholders": {
+            "stages": {
+                "type": "String"
+            }
+        }
+    },
+    "registerFailed": "注册失败：{error}",
+    "@registerFailed": {
+        "placeholders": {
+            "error": {
+                "type": "String"
+            }
+        }
+    },
+    "changeServer": "更换服务器",
+    "serverAddress": "服务器地址",
+    "pleaseEnterYourHomeserver": "请填写服务器地址",
     "senderHasInvitedYouToTheSpace": "{sender} 已邀请你到 '{nameOrAlias}'空间。",
     "@senderHasInvitedYouToTheSpace": {
         "placeholders": {
