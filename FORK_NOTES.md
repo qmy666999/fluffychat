@@ -52,6 +52,28 @@ POST → 200（body 带 "auth":{"type":"m.login.dummy"}，直接注册成功）
 
 > 多账户能力保留：设置 → 添加账户 → 创建新账户 走的也是这个注册页。
 
+### 资料（昵称 / 头像）改完不刷新 —— 已修
+
+**现象**：在设置页改昵称或头像，界面还是旧的（名字变回小写 localpart、头像是首字母圆圈），
+退出登录再登录才正常；服务器上其实早就改了。
+
+**根因**（不是权限、不是服务器）：matrix 16.0.4 的 `getUserProfile()` 有**1 天的 profile 缓存**，
+只有收到该用户的 `m.room.member` 同步事件才会把它标记为过期。改自己的资料
+**不会**产生 member 事件，所以缓存一直被认为"新鲜"，界面永远读到旧值。
+另外 `getProfileFromUserId()` 会把请求异常吞掉、返回一堆 null，于是界面回退到
+`userID.localpart`（所以显示成小写）和默认头像。这也是「重登就好了」的原因——重登会重新拉一次 profile。
+
+**修法**：
+
+| 文件 | 改动 |
+| --- | --- |
+| `lib/utils/profile_refresh.dart`（新增） | `client.refreshOwnProfile()`：用 `maxCacheAge: Duration.zero` 强制走服务器刷新缓存，然后 `onUserProfileUpdate.add(userId)` 通知界面 |
+| `lib/pages/settings/settings.dart` | 改完资料 `await updateProfile()`：先强刷，再把新的 `Profile` 存进 state（原来是 FutureBuilder + 空 future，重载时会闪回 localpart） |
+| `lib/pages/settings/settings.dart` | 头像选图后统一转成 512px JPEG：手机端用 `ImagePicker(maxWidth/maxHeight/imageQuality)`，让平台解码器处理 HEIC（Synapse 生成不了 HEIC 缩略图，头像会变灰），再兜一层 Dart 解码压缩 |
+| `lib/pages/chat_list/client_chooser_button.dart` | 改成 StatefulWidget，监听 `onUserProfileUpdate`，顶栏头像/名字立刻跟着变 |
+
+> 顺带说明：`m.room.member` 的头像缓存（聊天记录里自己那条消息旁边的头像）不在这次修的范围内，
+> 它要等下一次成员事件或重登才会更新，不影响设置页和顶栏。
 ### 图标与应用名
 
 - 应用名：`android/app/src/main/AndroidManifest.xml` 里的 `android:label="QIVchat"`

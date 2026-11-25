@@ -1,7 +1,9 @@
-// SPDX-FileCopyrightText: 2019-Present Christian Kußowski
+// SPDX-FileCopyrightText: 2019-Present Christian Ku脽owski
 // SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
+import 'dart:async';
 
 import 'package:async/async.dart';
 import 'package:fluffychat/l10n/l10n.dart';
@@ -15,10 +17,56 @@ import 'package:url_launcher/url_launcher_string.dart';
 import '../../utils/fluffy_share.dart';
 import 'chat_list.dart';
 
-class ClientChooserButton extends StatelessWidget {
+class ClientChooserButton extends StatefulWidget {
   final ChatListController controller;
 
   const ClientChooserButton(this.controller, {super.key});
+
+  @override
+  State<ClientChooserButton> createState() => _ClientChooserButtonState();
+}
+
+class _ClientChooserButtonState extends State<ClientChooserButton> {
+  /// The own profile shown in the button.
+  ///
+  /// It is kept in the state instead of being fetched inline by a FutureBuilder
+  /// so that [Client.onUserProfileUpdate] can refresh it without a rebuild of
+  /// the whole chat list. Without the listener the avatar would keep showing the
+  /// old picture (and the display name its fallback) after the user changed the
+  /// profile, because the SDK profile cache is not invalidated by the change.
+  Profile? _profile;
+  Client? _client;
+  StreamSubscription<String>? _profileSubscription;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final client = Result(() => Matrix.of(context).client).asValue?.value;
+    if (client == _client) return;
+    _client = client;
+    _profileSubscription?.cancel();
+    _profileSubscription = null;
+    _profile = null;
+    if (client == null) return;
+    _profileSubscription = client.onUserProfileUpdate.stream.listen((userId) {
+      if (userId == client.userID) _loadProfile();
+    });
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final client = _client;
+    if (client == null || !client.isLogged()) return;
+    final profile = await client.fetchOwnProfile();
+    if (!mounted || client != _client) return;
+    setState(() => _profile = profile);
+  }
+
+  @override
+  void dispose() {
+    _profileSubscription?.cancel();
+    super.dispose();
+  }
 
   List<PopupMenuEntry<Object>> _bundleMenuItems(BuildContext context) {
     final matrix = Matrix.of(context);
@@ -141,7 +189,7 @@ class ClientChooserButton extends StatelessWidget {
                         const SizedBox(width: 12),
                         IconButton(
                           icon: const Icon(Icons.edit_outlined),
-                          onPressed: () => controller.editBundlesForAccount(
+                          onPressed: () => widget.controller.editBundlesForAccount(
                             client.userID,
                             bundle,
                           ),
@@ -171,24 +219,19 @@ class ClientChooserButton extends StatelessWidget {
     final matrix = Matrix.of(context);
     final client = Result(() => matrix.client).asValue?.value;
 
-    var clientCount = 0;
-    matrix.accountBundles.forEach((key, value) => clientCount += value.length);
-    return FutureBuilder<Profile>(
-      future: client?.isLogged() == true ? client?.fetchOwnProfile() : null,
-      builder: (context, snapshot) => Material(
-        clipBehavior: Clip.hardEdge,
-        borderRadius: BorderRadius.circular(99),
-        color: Colors.transparent,
-        child: PopupMenuButton<Object>(
-          key: Key('accounts_and_settings_buttons'),
-          tooltip: L10n.of(context).accountsAndSettings,
-          onSelected: (o) => _clientSelected(o, context),
-          itemBuilder: _bundleMenuItems,
-          icon: Avatar(
-            mxContent: snapshot.data?.avatarUrl,
-            name: snapshot.data?.displayName ?? client?.userID?.localpart,
-            size: 32,
-          ),
+    return Material(
+      clipBehavior: Clip.hardEdge,
+      borderRadius: BorderRadius.circular(99),
+      color: Colors.transparent,
+      child: PopupMenuButton<Object>(
+        key: const Key('accounts_and_settings_buttons'),
+        tooltip: L10n.of(context).accountsAndSettings,
+        onSelected: (o) => _clientSelected(o, context),
+        itemBuilder: _bundleMenuItems,
+        icon: Avatar(
+          mxContent: _profile?.avatarUrl,
+          name: _profile?.displayName ?? client?.userID?.localpart,
+          size: 32,
         ),
       ),
     );
@@ -196,9 +239,9 @@ class ClientChooserButton extends StatelessWidget {
 
   Future<void> _clientSelected(Object object, BuildContext context) async {
     if (object is Client) {
-      controller.setActiveClient(object);
+      widget.controller.setActiveClient(object);
     } else if (object is String) {
-      controller.setActiveBundle(object);
+      widget.controller.setActiveBundle(object);
     } else if (object is SettingsAction) {
       switch (object) {
         case SettingsAction.addAccount:
@@ -223,7 +266,7 @@ class ClientChooserButton extends StatelessWidget {
           context.go('/rooms/archive');
           break;
         case SettingsAction.setStatus:
-          controller.setStatus();
+          widget.controller.setStatus();
           break;
       }
     }

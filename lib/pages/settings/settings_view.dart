@@ -43,10 +43,9 @@ class SettingsView extends StatelessWidget {
         child: ListView(
           key: const Key('SettingsListViewContent'),
           children: <Widget>[
-            FutureBuilder<Profile>(
-              future: controller.profileFuture,
-              builder: (context, snapshot) {
-                final profile = snapshot.data;
+            Builder(
+              builder: (context) {
+                final profile = controller.profile;
                 final avatar = profile?.avatarUrl;
                 final mxid =
                     Matrix.of(context).client.userID ?? L10n.of(context).user;
