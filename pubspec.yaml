@@ -126,18 +126,20 @@ hooks:
       url_pattern: https://gh-proxy.com/https://github.com/simolus3/sqlite3.dart/releases/download/$RELEASE_TAG/$FILENAME
 
 flutter_launcher_icons:
-  image_path: assets/logo/img/logo.png
+  image_path: assets/logo/img/qivchat.png
   android: true
-  adaptive_icon_foreground: assets/logo/img/logo_foreground.png
-  adaptive_icon_background: assets/logo/img/logo_background.png
-  adaptive_icon_monochrome: assets/logo/img/logo_mono.png
-  ios: true
+  adaptive_icon_foreground: assets/logo/img/qivchat_foreground.png
+  adaptive_icon_background: assets/logo/img/qivchat_bg.png
+  adaptive_icon_foreground_inset: 10
+  # This fork only ships Android builds, so the iOS / macOS / Windows / web
+  # icons keep the upstream FluffyChat artwork instead of being regenerated.
+  ios: false
   macos:
-    generate: true
+    generate: false
   windows:
-    generate: true
+    generate: false
   web:
-    generate: true
+    generate: false
     image_path: assets/logo/img/logo_standalone.png
     background_color: "#FFFFFF"
     theme_color: "#41a2bc"

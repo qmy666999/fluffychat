@@ -1,7 +1,7 @@
-# FluffyChat 注册版（个人分支说明）
+# QIVchat（FluffyChat 个人分支说明）
 
 这是 [krille-chan/fluffychat](https://github.com/krille-chan/fluffychat) 的个人分叉，
-在上游代码基础上**新增了「应用内注册」**，并针对自己的服务器做了默认值调整。
+在上游代码基础上**新增了「应用内注册」**，改了应用名和图标，并针对自己的服务器做了默认值调整。
 
 上游 FluffyChat 本身**没有**注册页面：`/home/sign_up` 只是让你选服务器，然后跳转到
 该服务器的网页注册。本分支直接在 App 里调用 Matrix 的
@@ -24,22 +24,11 @@
 | `lib/config/setting_keys.dart` | 默认服务器改为 `qmypc.tail7337aa.ts.net`（只影响预选，仍可手动填别的） |
 | `lib/l10n/intl_en.arb` / `intl_zh.arb` | 注册相关文案（英文 + 中文） |
 | `android/app/build.gradle.kts` | `applicationId` 改为 `chat.fluffy.fluffychat.reg`，可与官方版共存 |
-| `android/app/src/main/AndroidManifest.xml` | 应用名改为「FluffyChat 注册版」 |
+| `android/app/src/main/AndroidManifest.xml` | 应用名改为 `QIVchat` |
+| `assets/logo/img/qivchat*.png`、`android/app/src/main/res/mipmap-*`、`drawable-*` | 换成新的聊天气泡图标（见下方「图标与应用名」） |
 | `pubspec.yaml` | `hooks.user_defines.sqlite3.url_pattern` 走 GitHub 镜像（见第 4 节） |
 
-### 注册流程（实现要点）
-
-1. `GET /client/v3/register` 读取服务器支持的注册流程；
-2. 只支持「只要求 `m.login.dummy`」的开放注册。有验证码 / 条款 / 邮箱验证的服务器会明确
-   提示「请去网页注册」，不会假装成功；
-3. `client.register(...)`（matrix-dart-sdk 16.x）一次性完成注册并**直接连上会话**，
-   不用再登录一次、也不会留下多余的设备；如果服务器仍返回 `401 + session`，会带上
-   session 再试一次；
-4. 注册成功后跳 `/backup`（密钥备份引导页），与正常登录后的流程一致。
-
-> 多账户能力保留：设置 → 添加账户 → 创建新账户 走的也是这个注册页。
-
-### 注册请求（重要，踩过的坑）
+### 注册流程（实现要点，踩过的坑）
 
 这台 Synapse（1.67）**不支持** `GET /_matrix/client/v3/register`：
 
@@ -49,16 +38,35 @@ POST → 200（body 带 "auth":{"type":"m.login.dummy"}，直接注册成功）
 ```
 
 所以注册页**不能**先去 GET 探测注册流程（早期版本就是这么写的，结果页面上显示
-"Unrecognized request"），现在的做法是：
+"Unrecognized request"）。现在的做法是：
 
 1. 用 `http` 包直接 POST `https://<homeserver>/_matrix/client/v3/register`
    （URL 自己拼，不依赖 SDK 的路径拼接；`debugPrint` 会打印 `REGISTER URL = ...`
-   和 `REGISTER RESP = <status> <body>`）；
+   和 `REGISTER RESP = <status> <body>`，release 包也能在 logcat 里看到）；
 2. body 里带 `auth: {type: m.login.dummy}` 和 `inhibit_login: true`，
    避免注册时多出一个没人用的设备、也避免 access_token 出现在日志里；
-3. 200 → 拿响应里的 `user_id`，再用同一套凭据 `client.login(...)`，让 SDK 接管会话；
+3. 200 → 拿响应里的 `user_id`，再用同一套凭据 `client.login(...)` 让 SDK 接管会话，
+   然后跳 `/backup`（密钥备份引导页），与正常登录后的流程一致；
 4. 非 200 → 错误框里显示「状态码 + 服务器原文」，还会附一句人话解释
    （用户名被占/密码太弱/未开放注册/需要网页验证等），下次出问题一眼能看出来。
+
+> 多账户能力保留：设置 → 添加账户 → 创建新账户 走的也是这个注册页。
+
+### 图标与应用名
+
+- 应用名：`android/app/src/main/AndroidManifest.xml` 里的 `android:label="QIVchat"`
+- 图标源图：`assets/logo/img/qivchat.png`（整张 square 图，作为传统图标）
+  - `qivchat_foreground.png`：自适应图标的前景层（跟 qivchat.png 同一张图，缩放由
+    `adaptive_icon_foreground_inset: 10` 控制）
+  - `qivchat_bg.png`：自适应图标的背景层（与源图同一套 米色→粉色 渐变，保证接缝看不出来）
+- 生成命令（改了图标源图后跑一次，会覆盖 `res/mipmap-*` 和 `res/drawable-*`）：
+  ```powershell
+  dart run flutter_launcher_icons
+  ```
+- 只生成了 Android 图标；iOS / macOS / Windows / web 图标保持上游 FluffyChat 原样
+  （`pubspec.yaml` 里把那些平台设成了 `generate: false`）。
+- 应用内界面里的 Logo（登录页/关于页）还是 FluffyChat 的 `assets/logo/mini/logo_mini.png`，
+  要换就是替换图片文件。
 
 ---
 
@@ -168,6 +176,8 @@ keyPassword=...
 
 `applicationId` 是 `chat.fluffy.fluffychat.reg`，所以**可以**和官方 FluffyChat 同时安装，
 不用卸载官方版。代价：它是另一个 App，本地数据库 / 登录状态互不相干。
+
+应用名是 `QIVchat`、图标也换了，所以桌面上和官方 FluffyChat 一眼就能分开。
 
 想覆盖官方版？那需要官方私钥签名，办不到。
 
