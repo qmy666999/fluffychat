@@ -352,6 +352,17 @@ abstract class AppRoutes {
                           ),
                           redirect: loggedOutRedirect,
                         ),
+                        // 「添加账户」这条入口也要能进应用内注册页，
+                        // 否则和 /rooms/settings/login 是同一类缺路由的错误。
+                        GoRoute(
+                          path: 'register',
+                          pageBuilder: (context, state) => defaultPageBuilder(
+                            context,
+                            state,
+                            const RegisterPage(),
+                          ),
+                          redirect: loggedOutRedirect,
+                        ),
                         GoRoute(
                           path: 'login',
                           pageBuilder: (context, state) => defaultPageBuilder(

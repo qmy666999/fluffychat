@@ -64,10 +64,24 @@ Future<void> connectToHomeserverFlow(
         await launchUrlString(regLink);
       }
       if (!context.mounted) return;
-      final pathSegments = List.of(
-        GoRouter.of(context).routeInformationProvider.value.uri.pathSegments,
-      );
-      if (pathSegments.last != 'home') pathSegments.removeLast();
+      // 登录页路径要按当前入口算，入口层级并不一样：
+      //   /home                  → /home/login
+      //   /home/sign_in          → /home/login
+      //   /rooms/settings/addaccount → /rooms/settings/addaccount/login
+      // 以前是「去掉最后一段再拼 login」，从「添加账户」进来就会拼成
+      // /rooms/settings/login —— 路由表里没有，直接 Page Not Found。
+      final pathSegments = GoRouter.of(context)
+          .routeInformationProvider
+          .value
+          .uri
+          .path
+          .split('/')
+          .where((segment) => segment.isNotEmpty)
+          .toList();
+      if (pathSegments.isNotEmpty &&
+          (pathSegments.last == 'sign_in' || pathSegments.last == 'sign_up')) {
+        pathSegments.removeLast();
+      }
       pathSegments.add('login');
       context.push('/${pathSegments.join('/')}', extra: client);
       setState(AsyncSnapshot.withData(ConnectionState.done, true));
