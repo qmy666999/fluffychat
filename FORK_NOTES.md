@@ -65,8 +65,8 @@ POST → 200（body 带 "auth":{"type":"m.login.dummy"}，直接注册成功）
   ```
 - 只生成了 Android 图标；iOS / macOS / Windows / web 图标保持上游 FluffyChat 原样
   （`pubspec.yaml` 里把那些平台设成了 `generate: false`）。
-- 应用内界面里的 Logo（登录页/关于页）还是 FluffyChat 的 `assets/logo/mini/logo_mini.png`，
-  要换就是替换图片文件。
+- 应用内 Logo（intro / 登录 / 注册 / 关于页用的 `assets/logo/mini/logo_mini.png`）和锁屏、空页面的
+  水印（`logo_mono_mini.png`）也一起换成了新图标（水印是单色剪影，用于 `Image.asset(color:)` 着色）。
 
 ---
 
