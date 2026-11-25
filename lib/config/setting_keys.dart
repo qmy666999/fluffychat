@@ -52,7 +52,7 @@ enum AppSettings<T> {
   ),
   displayChatDetailsColumn('chat.fluffy.display_chat_details_column', false),
   // AppConfig-mirrored settings
-  applicationName<String>('chat.fluffy.application_name', 'FluffyChat'),
+  applicationName<String>('chat.fluffy.application_name', 'QIVchat'),
   // The default homeserver of this fork build. Change this one line if the
   // homeserver moves; it is only a pre-selection, users can still enter any
   // other homeserver manually.
