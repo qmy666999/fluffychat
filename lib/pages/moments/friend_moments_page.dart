@@ -28,6 +28,7 @@ class FriendMomentsPage extends StatefulWidget {
 
 class _FriendMomentsPageState extends State<FriendMomentsPage> {
   Room? _room;
+  Uri? _cover;
   List<MomentViewData> _moments = const [];
   bool _loading = true;
 
@@ -43,9 +44,11 @@ class _FriendMomentsPageState extends State<FriendMomentsPage> {
     try {
       final room = _service.room;
       final events = await _service.momentsBySender(widget.userId);
+      final cover = await _service.coverForAsync(widget.userId);
       if (!mounted) return;
       setState(() {
         _room = room;
+        _cover = cover;
         _moments = events
             .map(
               (event) => MomentViewData(
@@ -87,7 +90,7 @@ class _FriendMomentsPageState extends State<FriendMomentsPage> {
     final theme = Theme.of(context);
     final l10n = L10n.of(context);
     final name = _nameOf(widget.userId);
-    final cover = _service.coverFor(widget.userId);
+    final cover = _cover;
     final groups = groupMomentsByDate(_moments, l10n: l10n);
 
     return Scaffold(

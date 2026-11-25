@@ -34,6 +34,7 @@ class _MomentsPageState extends State<MomentsPage> {
   final ScrollController _scroll = ScrollController();
   Timeline? _timeline;
   Room? _room;
+  Uri? _cover;
   bool _loading = true;
   bool _loadingMore = false;
   String? _error;
@@ -54,6 +55,7 @@ class _MomentsPageState extends State<MomentsPage> {
 
   Future<void> _refresh({bool pull = false}) async {
     final startedAt = DateTime.now();
+    final userId = Matrix.of(context).client.userID ?? '';
     try {
       final room = _service.room ?? await _service.ensureRoom();
       _room = room;
@@ -67,9 +69,10 @@ class _MomentsPageState extends State<MomentsPage> {
         },
       );
       unawaited(_service.inviteMissingFriends(room));
-      // 旧封面在私有账号数据里，首次打开时迁到房间状态事件，别人才能看到。
+      // 旧封面（账号数据/状态事件）迁成自己的普通消息事件。
       unawaited(_service.migrateLegacyCover());
       unawaited(_service.markSeen());
+      final cover = await _service.coverForAsync(userId);
       if (pull) {
         // 下拉刷新转圈至少 600ms
         final elapsed = DateTime.now().difference(startedAt);
@@ -80,6 +83,7 @@ class _MomentsPageState extends State<MomentsPage> {
       if (!mounted) return;
       setState(() {
         _timeline = timeline;
+        _cover = cover;
         _loading = false;
         _error = null;
       });
@@ -293,7 +297,7 @@ class _MomentsPageState extends State<MomentsPage> {
     final userId = client.userID ?? '';
     final name = _nameOf(userId);
     final avatar = _avatarOf(userId);
-    final cover = _service.coverImage;
+    final cover = _cover;
 
     return GestureDetector(
       onTap: _changeCover,
@@ -357,17 +361,19 @@ class _MomentsPageState extends State<MomentsPage> {
     );
   }
 
-  /// 点封面换图：选图 → 转 JPEG（HEIC 也不会变灰）→ 上传 → 写账号数据。
+  /// 点封面换图：选图 → 转 JPEG（HEIC 也不会变灰）→ 上传 → 发一条封面事件。
   Future<void> _changeCover() async {
     final l10n = L10n.of(context);
+    final userId = Matrix.of(context).client.userID ?? '';
     final files = await selectFiles(context, type: FileType.image);
     final file = files.isEmpty ? null : files.first;
     if (file == null) return;
     try {
       final bytes = prepareImageBytes(await file.readAsBytes(), maxSide: 1600);
       await _service.setCover(bytes);
+      final cover = await _service.coverForAsync(userId);
       if (!mounted) return;
-      setState(() {});
+      setState(() => _cover = cover);
     } on UnsupportedAvatarFormat {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

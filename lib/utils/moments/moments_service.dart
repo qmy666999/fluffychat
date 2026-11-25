@@ -30,50 +30,88 @@ class MomentsService {
 
   int get lastSeenTs => (_config['last_seen_ts'] as num?)?.toInt() ?? 0;
 
-  /// 封面存在房间状态事件里（state_key = 用户 id），这样别人也读得到。
-  Uri? coverFor(String userId) {
+  /// 封面是**普通消息事件**（不是状态事件）。
+  ///
+  /// 状态事件的 state_key 可以伪造——只要权限放开，谁都能写 `state_key = 别人`
+  /// 改别人的封面。普通事件的 sender 由服务器签名，无法伪造，天然「只能改自己的」。
+  /// 取某个人最新的一条封面事件。
+  Future<Uri?> coverForAsync(String userId) async {
+    final latest = await _latestCoverEvent(userId);
+    if (latest != null) return latest;
+    // 兼容旧版：早先封面存在状态事件里，读到就先用着。
+    return _legacyStateCover(userId);
+  }
+
+  Future<Uri?> _latestCoverEvent(String userId) async {
+    final momentsRoom = room;
+    if (momentsRoom == null) return null;
+    try {
+      final tl = await momentsRoom.getTimeline(limit: 30);
+      for (var page = 0; page < 3; page++) {
+        final hits = tl.events
+            .where(
+              (e) =>
+                  e.type == coverEventType &&
+                  e.senderId == userId &&
+                  !e.redacted,
+            )
+            .toList();
+        if (hits.isNotEmpty) {
+          hits.sort((a, b) => b.originServerTs.compareTo(a.originServerTs));
+          final image = hits.first.content['image'];
+          if (image is String && image.isNotEmpty) return Uri.tryParse(image);
+        }
+        if (!tl.canRequestHistory) break;
+        await tl.requestHistory(historyCount: 50);
+      }
+    } catch (e) {
+      debugPrint('[moments] read cover failed: $e');
+    }
+    return null;
+  }
+
+  Uri? _legacyStateCover(String userId) {
     final event = room?.states[coverEventType]?[userId];
     final image = event?.content['image'];
     if (image is! String || image.isEmpty) return null;
     return Uri.tryParse(image);
   }
 
-  /// 自己的封面。
-  Uri? get coverImage {
-    final userId = client.userID;
-    return userId == null ? null : coverFor(userId);
-  }
-
   Future<void> setCover(Uint8List bytes) async {
-    final userId = client.userID;
-    if (userId == null) return;
     final momentsRoom = await ensureRoom();
     final mxc = await client.uploadContent(
       bytes,
       filename: 'cover.jpg',
       contentType: 'image/jpeg',
     );
-    // 写房间状态事件：账号数据是私有的，别人读不到。
-    await client.setRoomStateWithKey(momentsRoom.id, coverEventType, userId, {
+    // 用普通消息事件：sender 由服务器鉴权，别人改不了我的，我也改不了别人的。
+    await momentsRoom.sendEvent({
       'image': mxc.toString(),
       'updated_at': DateTime.now().millisecondsSinceEpoch,
-    });
+    }, type: coverEventType);
   }
 
-  /// 旧版封面存在私有账号数据里，首次进朋友圈时迁到房间状态事件。
+  /// 把旧封面（账号数据里的 / 房间状态事件里的）迁成自己的普通消息事件。
   Future<void> migrateLegacyCover() async {
     final userId = client.userID;
     if (userId == null) return;
-    final legacy = client.accountData[coverEventType]?.content['image'];
-    if (legacy is! String || legacy.isEmpty) return;
-    if (coverFor(userId) != null) return;
+    if (await _latestCoverEvent(userId) != null) return;
+
+    final fromState = _legacyStateCover(userId)?.toString();
+    final fromAccountData = client.accountData[coverEventType]?.content['image'];
+    final image = fromState ??
+        (fromAccountData is String && fromAccountData.isNotEmpty
+            ? fromAccountData
+            : null);
+    if (image == null) return;
+
     try {
       final momentsRoom = await ensureRoom();
-      await client.setRoomStateWithKey(momentsRoom.id, coverEventType, userId, {
-        'image': legacy,
+      await momentsRoom.sendEvent({
+        'image': image,
         'updated_at': DateTime.now().millisecondsSinceEpoch,
-      });
-      debugPrint('[moments] migrated legacy cover to room state');
+      }, type: coverEventType);
+      debugPrint('[moments] migrated legacy cover to timeline event');
     } catch (e) {
       debugPrint('[moments] migrate cover failed: $e');
     }
