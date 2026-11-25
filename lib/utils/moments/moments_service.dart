@@ -109,25 +109,117 @@ class MomentsService {
   }
 
   Room? get room {
-    final id = roomId;
+    final id = canonicalRoomId;
     return id == null ? null : client.getRoomById(id);
   }
 
-  /// 找到或创建朋友圈房间（不加密，好友先邀请进来）。
+  /// 朋友圈用的是固定别名的公开房间，任何账号都能自己 join，
+  /// 不需要谁去「邀请」，用户也感知不到房间的存在。
+  String? get alias {
+    final host = client.homeserver?.host;
+    if (host == null || host.isEmpty) return null;
+    return '$canonicalAliasLocalPart:$host';
+  }
+
+  static const canonicalAliasLocalPart = '#moments';
+
+  /// 按账号缓存别名解析结果（多账号登录时不能互相串）。
+  static final Map<String, String> _resolved = {};
+
+  String get _cacheKey => client.userID ?? '';
+
+  /// 解析别名的结果（缓存），没有就回落账号数据里记的 room_id。
+  String? get canonicalRoomId => _resolved[_cacheKey] ?? roomId;
+
+  Future<String?> resolveRoomId() async {
+    final cached = _resolved[_cacheKey];
+    if (cached != null) return cached;
+    final alias = this.alias;
+    if (alias != null) {
+      try {
+        final resolved = await client.getRoomIdByAlias(alias);
+        final id = resolved.roomId;
+        if (id != null && id.isNotEmpty) {
+          _resolved[_cacheKey] = id;
+          return id;
+        }
+      } catch (e) {
+        debugPrint('[moments] alias $alias not resolved: $e');
+      }
+    }
+    final fallback = roomId;
+    if (fallback != null) _resolved[_cacheKey] = fallback;
+    return fallback;
+  }
+
+  /// 启动时静默加入：失败不提示，只记日志。
+  Future<void> ensureJoined() async {
+    if (!client.isLogged()) return;
+    final id = await resolveRoomId();
+    if (id == null) return;
+    final existing = client.getRoomById(id);
+    if (existing != null && existing.membership == Membership.join) return;
+    try {
+      await client.joinRoomById(id);
+      debugPrint('[moments] silently joined $id');
+    } catch (e) {
+      debugPrint('[moments] silent join failed: $e');
+    }
+  }
+
+  /// 这个房间该不该从会话列表里藏掉。
+  ///
+  /// 别名解析到的房间、账号数据里记的房间，以及**所有叫「朋友圈」的历史重复房间**
+  /// 都藏起来（老版本每个账号各建了一个，之前会显示成一堆群）。
+  bool hidesRoom(Room room) {
+    if (room.id == canonicalRoomId) return true;
+    final name = room.name.trim();
+    if (name == roomName) return true;
+    // 老版本/测试留下的「朋友圈 · xxx」这类变体也一起藏掉
+    if (name.startsWith('$roomName · ') || name.startsWith('$roomName·')) {
+      return true;
+    }
+    return false;
+  }
+
+  /// 找到或创建朋友圈房间（公开 + 固定别名，不加密）。
   Future<Room> ensureRoom() async {
-    final existing = room;
-    if (existing != null && existing.membership == Membership.join) {
-      return existing;
+    // 1) 别名能解析到 → 直接 join（已经在房间里就什么都不做）
+    final resolvedId = await resolveRoomId();
+    if (resolvedId != null) {
+      final joined = client.getRoomById(resolvedId);
+      if (joined != null && joined.membership == Membership.join) return joined;
+      try {
+        await client.joinRoomById(resolvedId);
+      } catch (e) {
+        debugPrint('[moments] join $resolvedId failed: $e');
+      }
+      final afterJoin = client.getRoomById(resolvedId);
+      if (afterJoin != null) return afterJoin;
     }
 
-    final friends = FriendsService(client).load().friends;
-    final id = await client.createRoom(
-      name: roomName,
-      topic: 'FluffyChatX 朋友圈',
-      invite: friends.map((f) => f.userId).toList(),
-      preset: CreateRoomPreset.privateChat,
-      // 绝对不能加密：机器人和其他客户端要读得到。
-    );
+    // 2) 没有这个房间 → 建一个公开房间并占住别名
+    final String id;
+    try {
+      id = await client.createRoom(
+        name: roomName,
+        topic: 'FluffyChatX 朋友圈',
+        preset: CreateRoomPreset.publicChat,
+        roomAliasName: 'moments',
+        // 绝对不能加密：机器人和其他客户端要读得到。
+      );
+    } catch (e) {
+      // 别名可能刚被别人抢建，再解析一次
+      debugPrint('[moments] create room failed, retry alias: $e');
+      final retryId = await resolveRoomId();
+      if (retryId == null) rethrow;
+      await client.joinRoomById(retryId);
+      final retried = client.getRoomById(retryId);
+      if (retried == null) rethrow;
+      return retried;
+    }
+
+    _resolved[_cacheKey] = id;
     final userId = client.userID!;
     await client.setAccountData(userId, configEventType, {
       ..._config,

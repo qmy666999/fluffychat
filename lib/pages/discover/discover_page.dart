@@ -25,6 +25,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _refreshDot();
+    // 打开发现页时兜底再试一次静默加入（启动时可能还没解析到别名）。
+    _service.ensureJoined();
   }
 
   Future<void> _refreshDot() async {

@@ -169,11 +169,12 @@ class ChatListController extends State<ChatList>
 
   List<Room> get filteredRooms {
     final client = Matrix.of(context).client;
-    // 鏈嬪弸鍦堟埧闂村彧鍦ㄣ€屽彂鐜?鈫?鏈嬪弸鍦堛€嶉噷鍑虹幇锛屼笉杩涗細璇濆垪琛ㄣ€?
-    final momentsRoomId = MomentsService(client).roomId;
+    // 朋友圈只从「发现 → 朋友圈」进入，房间本身从会话列表里彻底隐藏
+    // （包括老版本每个账号各建一个、名字都叫「朋友圈」的重复房间）。
+    final moments = MomentsService(client);
     return client.rooms
         .where(getRoomFilterByActiveFilter(activeFilter))
-        .where((room) => room.id != momentsRoomId)
+        .where((room) => !moments.hidesRoom(room))
         .toList();
   }
 
@@ -441,6 +442,9 @@ class ChatListController extends State<ChatList>
       if (!mounted) return;
       // 濂藉弸绯荤粺锛氳ˉ鍘嗗彶绉佽亰鐨?m.direct 鏄犲皠 + 寮€濮嬫敹鐢宠/鎺ュ彈/鍒犻櫎浜嬩欢銆?
       FriendsSync.start(Matrix.of(context).client);
+      // 朋友圈是固定别名的公开房间：启动时静默加入，用户不用点任何东西，
+      // 也永远不会在会话列表里看到它。
+      unawaited(MomentsService(Matrix.of(context).client).ensureJoined());
       if (widget.activeSpace != null) {
         setActiveSpace(widget.activeSpace!);
       }
