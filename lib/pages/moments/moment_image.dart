@@ -69,33 +69,36 @@ class _MomentImageState extends State<MomentImage> {
       return;
     }
     final client = Matrix.of(context).client;
-    try {
-      final data = await client
-          .downloadMxcCached(
-            uri,
-            // 缩略图必须带尺寸，否则请求本身就是无效的。
-            // 尺寸 ×2 是为了适配高 DPI 屏幕；服务器开了动态缩略图后
-            // 会按这个尺寸现场生成，不会再拿 96px 拉伸。
-            width: widget.original
-                ? null
-                : (widget.width ?? 240) * 2,
-            height: widget.original
-                ? null
-                : (widget.height ?? 240) * 2,
-            isThumbnail: !widget.original,
-            thumbnailMethod: ThumbnailMethod.crop,
-          )
-          .timeout(Duration(seconds: widget.original ? 20 : 10));
-      if (!mounted) return;
-      setState(() {
-        _data = data;
-        _failed = data.isEmpty;
-      });
-    } catch (e) {
-      debugPrint('[moments] image load failed: $e');
-      if (!mounted) return;
-      setState(() => _failed = true);
+    // 先要缩略图（快）；失败再退回原图（保险），两次都失败才显示破图。
+    for (final useOriginal in [widget.original, true]) {
+      try {
+        final data = await client
+            .downloadMxcCached(
+              uri,
+              // 缩略图必须带尺寸，否则请求本身就是无效的。
+              // 尺寸 ×2 是为了适配高 DPI 屏幕；服务器开了动态缩略图后
+              // 会按这个尺寸现场生成，不会再拿 96px 拉伸。
+              width: useOriginal ? null : (widget.width ?? 240) * 2,
+              height: useOriginal ? null : (widget.height ?? 240) * 2,
+              isThumbnail: !useOriginal,
+              thumbnailMethod: ThumbnailMethod.crop,
+            )
+            .timeout(Duration(seconds: useOriginal ? 20 : 10));
+        if (!mounted) return;
+        if (data.isNotEmpty) {
+          setState(() {
+            _data = data;
+            _failed = false;
+          });
+          return;
+        }
+      } catch (e) {
+        debugPrint('[moments] image load failed (original=$useOriginal): $e');
+      }
+      if (useOriginal) break;
     }
+    if (!mounted) return;
+    setState(() => _failed = true);
   }
 
   @override

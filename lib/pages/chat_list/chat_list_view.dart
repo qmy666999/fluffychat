@@ -109,7 +109,7 @@ class ChatListView extends StatelessWidget {
                     !controller.isSearchMode &&
                         controller.activeSpaceId == null &&
                         !FluffyThemes.isColumnMode(context)
-                    ? ChatListBottomBar(controller)
+                    ? ChatListBottomBar(controller: controller)
                     : null,
               ),
             ),

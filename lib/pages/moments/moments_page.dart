@@ -37,6 +37,7 @@ class _MomentsPageState extends State<MomentsPage> {
   Uri? _cover;
   bool _loading = true;
   bool _loadingMore = false;
+  bool _hasMore = true;
   String? _error;
 
   MomentsService get _service => MomentsService(Matrix.of(context).client);
@@ -71,7 +72,12 @@ class _MomentsPageState extends State<MomentsPage> {
       unawaited(_service.inviteMissingFriends(room));
       // 旧封面（账号数据/状态事件）迁成自己的普通消息事件。
       unawaited(_service.migrateLegacyCover());
-      unawaited(_service.markSeen());
+      // 打开即标记已读：不写这条，发现页红点和底部角标会一直挂着。
+      try {
+        await _service.markSeen();
+      } catch (e) {
+        debugPrint('[moments] markSeen failed: $e');
+      }
       final cover = await _service.coverForAsync(userId);
       if (pull) {
         // 下拉刷新转圈至少 600ms
@@ -98,10 +104,24 @@ class _MomentsPageState extends State<MomentsPage> {
 
   Future<void> _loadMore() async {
     final timeline = _timeline;
-    if (timeline == null || _loadingMore) return;
+    if (timeline == null || _loadingMore || !_hasMore) return;
     setState(() => _loadingMore = true);
     try {
-      await timeline.requestHistory(historyCount: 20);
+      // 一页拉不到「动态」就继续拉，最多 5 页（点赞/封面事件会占窗口）。
+      var before = MomentsService.momentEvents(timeline.events).length;
+      for (var i = 0; i < 5; i++) {
+        if (!timeline.canRequestHistory) {
+          _hasMore = false;
+          break;
+        }
+        await timeline.requestHistory(historyCount: 50);
+        final after = MomentsService.momentEvents(timeline.events).length;
+        if (after > before) {
+          before = after;
+          break;
+        }
+      }
+      if (!timeline.canRequestHistory) _hasMore = false;
     } catch (e) {
       debugPrint('[moments] load more failed: $e');
     } finally {
@@ -224,7 +244,12 @@ class _MomentsPageState extends State<MomentsPage> {
               onRefresh: () => _refresh(pull: true),
               child: NotificationListener<ScrollNotification>(
                 onNotification: (notification) {
-                  if (notification.metrics.pixels <= 48) _loadMore();
+                  // 列表是「最新在上、更旧在下」，所以触底才加载更早的动态。
+                  final metrics = notification.metrics;
+                  if (metrics.axis != Axis.vertical) return false;
+                  if (metrics.pixels >= metrics.maxScrollExtent - 400) {
+                    _loadMore();
+                  }
                   return false;
                 },
                 child: CustomScrollView(
@@ -280,6 +305,21 @@ class _MomentsPageState extends State<MomentsPage> {
                               dimension: 20,
                               child: CircularProgressIndicator.adaptive(
                                 strokeWidth: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (!_loadingMore && !_hasMore && views.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Center(
+                            child: Text(
+                              l10n.momentsNoMore,
+                              style: TextStyle(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontSize: 12,
                               ),
                             ),
                           ),

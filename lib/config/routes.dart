@@ -25,6 +25,7 @@ import 'package:fluffychat/pages/discover/discover_page.dart';
 import 'package:fluffychat/pages/intro/intro_page_presenter.dart';
 import 'package:fluffychat/pages/invitation_selection/invitation_selection.dart';
 import 'package:fluffychat/pages/login/login.dart';
+import 'package:fluffychat/pages/me/me_page.dart';
 import 'package:fluffychat/pages/moments/friend_moments_page.dart';
 import 'package:fluffychat/pages/moments/moment_composer_page.dart';
 import 'package:fluffychat/pages/moments/moments_page.dart';
@@ -143,6 +144,11 @@ abstract class AppRoutes {
       path: '/discover',
       pageBuilder: (context, state) =>
           defaultPageBuilder(context, state, const DiscoverPage()),
+    ),
+    GoRoute(
+      path: '/me',
+      pageBuilder: (context, state) =>
+          defaultPageBuilder(context, state, const MePage()),
     ),
     // 朋友圈：全屏页面，故意不放底部导航（它是从发现页点进来的子页面）。
     GoRoute(

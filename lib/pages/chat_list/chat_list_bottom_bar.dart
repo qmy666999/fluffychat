@@ -4,23 +4,23 @@
 
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list.dart';
-import 'package:fluffychat/pages/chat_list/client_chooser_button.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
+import 'package:fluffychat/utils/moments/moments_service.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
-/// 底部四项导航：聊天 / 通讯录 / 发现 / 我。
+/// 底部四项导航：微信 / 通讯录 / 发现 / 我。
 ///
-/// 只做入口和布局：颜色全部取自当前主题（surfaceContainer / primary / error），
-/// 没有引入任何自定义色值；「我」就是原来顶栏那个头像，点击仍然弹出同一套
-/// 账号与设置菜单，所以功能一个都没丢。
+/// 四个页面都是平级 tab：点击用 `go` 切换（不压栈），所以二级页面不会出现
+/// 返回箭头，底部导航也一直都在。
 class ChatListBottomBar extends StatelessWidget {
-  final ChatListController controller;
+  final ChatListController? controller;
+  final int currentIndex;
 
-  const ChatListBottomBar(this.controller, {super.key});
+  const ChatListBottomBar({this.controller, this.currentIndex = 0, super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -38,18 +38,21 @@ class ChatListBottomBar extends StatelessWidget {
               Expanded(
                 child: _BottomBarItem(
                   label: L10n.of(context).bottomTabChats,
-                  selected: true,
-                  onTap: controller.clearActiveSpace,
+                  selected: currentIndex == 0,
+                  onTap: () => context.go('/rooms'),
                   icon: StreamBuilder(
                     stream: client.onSync.stream,
                     builder: (context, _) {
-                      final unread = client.rooms.fold<int>(
-                        0,
-                        (sum, room) => sum +
-                            (room.membership == Membership.join
-                                ? room.notificationCount
-                                : 0),
-                      );
+                      // 只统计可见会话：朋友圈房间被隐藏了，它的未读不能算进这个角标，
+                      // 否则会出现「有数字但列表里没有对应会话」。
+                      final moments = MomentsService(client);
+                      final unread = client.rooms
+                          .where(
+                            (room) =>
+                                room.membership == Membership.join &&
+                                !moments.hidesRoom(room),
+                          )
+                          .fold<int>(0, (sum, room) => sum + room.notificationCount);
                       return Badge(
                         isLabelVisible: unread > 0,
                         label: Text(unread > 99 ? '99+' : unread.toString()),
@@ -62,8 +65,8 @@ class ChatListBottomBar extends StatelessWidget {
               Expanded(
                 child: _BottomBarItem(
                   label: L10n.of(context).bottomTabContacts,
-                  selected: false,
-                  onTap: () => context.push('/contacts'),
+                  selected: currentIndex == 1,
+                  onTap: () => context.go('/contacts'),
                   icon: StreamBuilder(
                     stream: client.onSync.stream,
                     builder: (context, _) {
@@ -80,17 +83,40 @@ class ChatListBottomBar extends StatelessWidget {
               Expanded(
                 child: _BottomBarItem(
                   label: L10n.of(context).bottomTabDiscover,
-                  selected: false,
-                  onTap: () => context.push('/discover'),
+                  selected: currentIndex == 2,
+                  onTap: () => context.go('/discover'),
                   icon: const Icon(Icons.explore_outlined),
                 ),
               ),
               Expanded(
-                child: _MeBottomBarItem(controller: controller),
+                child: _BottomBarItem(
+                  label: L10n.of(context).bottomTabMe,
+                  selected: currentIndex == 3,
+                  onTap: () => context.go('/me'),
+                  icon: _MeAvatar(client: client),
+                ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _MeAvatar extends StatelessWidget {
+  final Client client;
+
+  const _MeAvatar({required this.client});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Profile>(
+      future: client.isLogged() ? client.fetchOwnProfile() : null,
+      builder: (context, snapshot) => Avatar(
+        mxContent: snapshot.data?.avatarUrl,
+        name: snapshot.data?.displayName ?? client.userID?.localpart,
+        size: 24,
       ),
     );
   }
@@ -134,67 +160,6 @@ class _BottomBarItem extends StatelessWidget {
               color: selected
                   ? theme.colorScheme.primary
                   : theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 「我」= 原来顶栏右上角的头像。点击复用 ClientChooserButton 那套菜单，
-/// 账号切换 / 新建群组 / 归档 / 设置等入口都还在。
-class _MeBottomBarItem extends StatelessWidget {
-  final ChatListController controller;
-
-  const _MeBottomBarItem({required this.controller});
-
-  Future<void> _showAccountMenu(BuildContext context) async {
-    final button = ClientChooserButton(controller);
-    final items = button.bundleMenuItems(context);
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
-    final box = context.findRenderObject() as RenderBox?;
-    if (overlay == null || box == null) return;
-    final position = RelativeRect.fromRect(
-      Rect.fromPoints(
-        box.localToGlobal(Offset.zero, ancestor: overlay),
-        box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay),
-      ),
-      Offset.zero & overlay.size,
-    );
-    final result = await showMenu<Object>(
-      context: context,
-      position: position,
-      items: items,
-    );
-    if (result == null) return;
-    if (!context.mounted) return;
-    await button.clientSelected(result, context);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final client = Matrix.of(context).client;
-    return InkWell(
-      onTap: () => _showAccountMenu(context),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          FutureBuilder<Profile>(
-            future: client.isLogged() ? client.fetchOwnProfile() : null,
-            builder: (context, snapshot) => Avatar(
-              mxContent: snapshot.data?.avatarUrl,
-              name: snapshot.data?.displayName ?? client.userID?.localpart,
-              size: 24,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            L10n.of(context).bottomTabMe,
-            style: TextStyle(
-              fontSize: 11,
-              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],

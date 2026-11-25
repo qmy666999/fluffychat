@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/chat_list/chat_list_bottom_bar.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
@@ -59,6 +60,8 @@ class _ContactsPageState extends State<ContactsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.bottomTabContacts),
+        centerTitle: true,
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             tooltip: l10n.addToContacts,
@@ -67,11 +70,15 @@ class _ContactsPageState extends State<ContactsPage> {
           ),
         ],
       ),
+      bottomNavigationBar: const ChatListBottomBar(currentIndex: 1),
       body: StreamBuilder(
         stream: client.onSync.stream,
         builder: (context, _) {
           final data = service.load();
-          final friends = [...data.friends]
+          // 好友列表里不能出现自己。
+          final friends = data.friends
+              .where((friend) => friend.userId != client.userID)
+              .toList()
             ..sort(
               (a, b) =>
                   a.title.toLowerCase().compareTo(b.title.toLowerCase()),
@@ -123,7 +130,7 @@ class _ContactsPageState extends State<ContactsPage> {
                     size: Avatar.defaultSize * 0.9,
                   ),
                   title: Text(friend.title, maxLines: 1),
-                  subtitle: Text(friend.userId, maxLines: 1),
+                  // 好友行只显示名字，不显示 Matrix ID（ID 在资料页里看）
                   trailing: const Icon(Icons.chat_bubble_outline),
                   onTap: () => _openChat(friend.userId),
                   onLongPress: () => context.push(
