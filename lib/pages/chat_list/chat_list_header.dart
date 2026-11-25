@@ -6,7 +6,9 @@
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list.dart';
+import 'package:fluffychat/utils/moments/moments_service.dart';
 import 'package:fluffychat/utils/sync_status_localization.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
@@ -57,10 +59,22 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
               client.prevBatch != null;
 
           if (!controller.isSearchMode) {
+            // 微信式：标题「微信」，有未读时显示「微信(N)」（不含隐藏的朋友圈房间）
+            final moments = MomentsService(client);
+            final unread = client.rooms
+                .where(
+                  (room) =>
+                      room.membership == Membership.join &&
+                      !moments.hidesRoom(room),
+                )
+                .fold<int>(0, (sum, room) => sum + room.notificationCount);
+            final title = unread > 0
+                ? '${L10n.of(context).bottomTabChats}($unread)'
+                : L10n.of(context).bottomTabChats;
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(L10n.of(context).chats),
+                Text(title),
                 // 同步状态/断线提示原来在搜索框的 hintText 里，位置挪到标题下面，
                 // 不然把输入框收成图标之后这条信息就没地方显示了。
                 if (!hide)
@@ -135,12 +149,35 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
             icon: const Icon(Icons.close_outlined),
             onPressed: controller.cancelSearch,
           )
-        else
+        else ...[
+          // 微信右上角「+」：发起群聊 / 添加朋友
+          PopupMenuButton<String>(
+            tooltip: L10n.of(context).createGroup,
+            icon: const Icon(Icons.add),
+            onSelected: (value) {
+              if (value == 'group') {
+                context.go('/rooms/newgroup');
+              } else if (value == 'friend') {
+                context.push('/contacts/add');
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'group',
+                child: Text(L10n.of(context).createGroup),
+              ),
+              PopupMenuItem(
+                value: 'friend',
+                child: Text(L10n.of(context).addToContacts),
+              ),
+            ],
+          ),
           IconButton(
             tooltip: L10n.of(context).search,
             icon: const Icon(Icons.search_outlined),
             onPressed: controller.startSearch,
           ),
+        ],
       ],
     );
   }

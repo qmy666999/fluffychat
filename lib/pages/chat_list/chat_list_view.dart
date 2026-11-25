@@ -9,7 +9,6 @@ import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/pages/chat_list/chat_list.dart';
 import 'package:fluffychat/pages/chat_list/chat_list_bottom_bar.dart';
 import 'package:fluffychat/pages/chat_list/navigation_rail.dart';
-import 'package:fluffychat/pages/chat_list/start_chat_fab.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'chat_list_body.dart';
@@ -92,19 +91,7 @@ class ChatListView extends StatelessWidget {
                     child: ChatListViewBody(controller),
                   ),
                 ),
-                floatingActionButton:
-                    !controller.isSearchMode &&
-                        controller.activeSpaceId == null &&
-                        !FluffyThemes.isColumnMode(context)
-                    ? ValueListenableBuilder(
-                        valueListenable: controller.scrolledToTop,
-                        builder: (context, scrolledToTop, _) => StartChatFab(
-                          extended:
-                              scrolledToTop &&
-                              !AppSettings.displayNavigationRail.value,
-                        ),
-                      )
-                    : const SizedBox.shrink(),
+                // 微信没有悬浮「新的聊天」按钮，入口收到右上角「+」里。
                 bottomNavigationBar:
                     !controller.isSearchMode &&
                         controller.activeSpaceId == null &&

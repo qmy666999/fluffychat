@@ -93,6 +93,7 @@ class _MomentsPageState extends State<MomentsPage> {
         _loading = false;
         _error = null;
       });
+      _autoFill();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -100,6 +101,17 @@ class _MomentsPageState extends State<MomentsPage> {
         _loading = false;
       });
     }
+  }
+
+  /// 内容不足一屏时滚动事件永远不触发，这里主动补拉，直到能滚动或到底。
+  void _autoFill() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || _loadingMore || !_hasMore) return;
+      if (!_scroll.hasClients) return;
+      if (_scroll.position.maxScrollExtent > 0) return;
+      await _loadMore();
+      if (mounted) _autoFill();
+    });
   }
 
   Future<void> _loadMore() async {
@@ -482,7 +494,12 @@ class _MomentCard extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(data.text),
                   ),
-                if (data.images.isNotEmpty)
+                if (data.images.length == 1)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: _SingleImage(uri: Uri.tryParse(data.images.first)),
+                  )
+                else if (data.images.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: _ImageGrid(images: data.images),
@@ -574,6 +591,27 @@ class _MomentCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SingleImage extends StatelessWidget {
+  final Uri? uri;
+
+  const _SingleImage({required this.uri});
+
+  @override
+  Widget build(BuildContext context) {
+    // 微信单图大约占正文宽度 60%，按 4:3 显示。
+    final width = MediaQuery.sizeOf(context).width * 0.6;
+    return SizedBox(
+      width: width,
+      height: width * 0.75,
+      child: MomentImage(
+        uri: uri,
+        fit: BoxFit.cover,
+        borderRadius: BorderRadius.circular(4),
       ),
     );
   }
