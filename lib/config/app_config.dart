@@ -18,7 +18,7 @@ abstract class AppConfig {
   static const String deepLinkPrefix = 'im.fluffychat://chat/';
   static const String schemePrefix = 'matrix:';
   static const String pushNotificationsChannelId = 'fluffychat_push';
-  static const String pushNotificationsAppId = 'chat.fluffy.fluffychat';
+  static const String pushNotificationsAppId = 'chat.fluffychatx';
   static const double borderRadius = 18.0;
   static const double spaceBorderRadius = 11.0;
   static const double columnWidth = 360.0;
@@ -37,12 +37,12 @@ abstract class AppConfig {
       '4894dfda-c70a-4ebc-b139-acae55f3988d';
 
   static const String sourceCodeUrl =
-      'https://github.com/krille-chan/fluffychat';
+      'https://github.com/qmy666999/fluffychat';
   static const String supportUrl =
-      'https://github.com/krille-chan/fluffychat/issues';
+      'https://github.com/qmy666999/fluffychat/issues';
   static const String changelogUrl = 'https://fluffychat.im/changelog/';
   static const String latestReleaseApiUrl =
-      'https://api.github.com/repos/krille-chan/fluffychat/releases/latest';
+      'https://api.github.com/repos/qmy666999/fluffychat/releases/latest';
   static const String helpUrl =
       'https://ko-fi.com/post/How-can-I-support-FluffyChat-J2G325WE6I';
 
@@ -51,7 +51,7 @@ abstract class AppConfig {
   static final Uri newIssueUrl = Uri(
     scheme: 'https',
     host: 'github.com',
-    path: '/krille-chan/fluffychat/issues/new',
+    path: '/qmy666999/fluffychat/issues/new',
   );
 
   static final Uri homeserverList = Uri(
