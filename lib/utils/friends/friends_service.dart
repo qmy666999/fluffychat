@@ -170,6 +170,7 @@ class FriendsService {
   static const requestsEventType = 'com.dafeiyu.friend_requests';
   static const requestRoomEventType = 'com.dafeiyu.friend_request';
   static const acceptRoomEventType = 'com.dafeiyu.friend_accept';
+  static const rejectRoomEventType = 'com.dafeiyu.friend_reject';
   static const removedRoomEventType = 'com.dafeiyu.friend_removed';
 
   final Client client;
@@ -406,9 +407,14 @@ class FriendsService {
     await _save(data);
 
     await markRoomAsDirect(request.peer, roomId);
+    // 只是「被邀请」的话发不了状态事件，而且双方不在同一个会话里。
+    await _ensureJoined(roomId);
+    final profile = await client.fetchOwnProfile();
     try {
       await client.setRoomStateWithKey(roomId, acceptRoomEventType, me, {
         'by': me,
+        'name': profile.displayName ?? me.localpart,
+        'avatar_url': profile.avatarUrl?.toString(),
         'ts': DateTime.now().millisecondsSinceEpoch,
       });
     } catch (e, s) {
@@ -418,6 +424,7 @@ class FriendsService {
   }
 
   Future<void> rejectRequest(FriendRequestEntry request) async {
+    final me = client.userID;
     final data = load();
     for (final r in data.incoming) {
       if (r.peer == request.peer) r.status = FriendRequestStatus.rejected;
@@ -426,6 +433,32 @@ class FriendsService {
       if (r.peer == request.peer) r.status = FriendRequestStatus.rejected;
     }
     await _save(data);
+
+    // 让发起方也知道被拒了（否则他那边一直显示「等待验证」）。
+    final roomId = request.roomId;
+    if (me == null || roomId == null) return;
+    await _ensureJoined(roomId);
+    try {
+      await client.setRoomStateWithKey(roomId, rejectRoomEventType, me, {
+        'by': me,
+        'ts': DateTime.now().millisecondsSinceEpoch,
+      });
+    } catch (e) {
+      debugPrint('[friends] reject event failed: $e');
+    }
+  }
+
+  /// 被邀请状态下进房间，之后才能发状态事件，也让双方落在同一个 room_id 上。
+  Future<void> _ensureJoined(String roomId) async {
+    final room = client.getRoomById(roomId);
+    if (room == null) return;
+    if (room.membership == Membership.join) return;
+    if (room.membership != Membership.invite) return;
+    try {
+      await client.joinRoomById(roomId);
+    } catch (e) {
+      debugPrint('[friends] join $roomId failed: $e');
+    }
   }
 
   /// 删好友：本地名单删掉，并在私聊房间里留一条 removed 事件，
@@ -496,13 +529,24 @@ class FriendsService {
       final acceptStates = room.states[acceptRoomEventType];
       if (acceptStates != null) {
         for (final event in acceptStates.values) {
-          final by = event.content['by'] as String?;
+          final by = (event.content['by'] as String?) ?? event.stateKey;
           if (by == null || by == me) continue;
           if (data.isFriend(by)) continue;
+          // 名字/头像：新版客户端会把资料写进事件；老事件只能回落到房间成员信息。
+          final member = room.getState(EventTypes.RoomMember, by);
+          final eventName = (event.content['name'] as String?)?.trim();
+          final memberName =
+              (member?.content['displayname'] as String?)?.trim() ?? '';
+          final avatar =
+              (event.content['avatar_url'] as String?) ??
+              (member?.content['avatar_url'] as String?);
           data.friends.add(
             FriendEntry(
               userId: by,
-              displayName: room.getLocalizedDisplayname(),
+              displayName: (eventName != null && eventName.isNotEmpty)
+                  ? eventName
+                  : memberName,
+              avatarUrl: avatar,
             ),
           );
           for (final r in data.incoming) {
@@ -526,6 +570,21 @@ class FriendsService {
           changed = true;
         }
       }
+
+      // 对方拒绝了申请 → 只把 outgoing 标成已拒绝，绝不写进好友名单。
+      final rejectStates = room.states[rejectRoomEventType];
+      if (rejectStates != null) {
+        for (final event in rejectStates.values) {
+          final by = (event.content['by'] as String?) ?? event.stateKey;
+          if (by == null || by == me) continue;
+          for (final r in data.outgoing) {
+            if (r.peer == by && r.status == FriendRequestStatus.pending) {
+              r.status = FriendRequestStatus.rejected;
+              changed = true;
+            }
+          }
+        }
+      }
     }
 
     if (changed) await _save(data);
@@ -536,24 +595,41 @@ class FriendsService {
 /// 全局只保留一份同步监听，避免多个页面重复订阅。
 class FriendsSync {
   static final Set<String> _started = {};
-  static StreamSubscription<SyncUpdate>? _sub;
+  static final Map<String, StreamSubscription<SyncUpdate>> _subs = {};
+  static DateTime _lastScan = DateTime.fromMillisecondsSinceEpoch(0);
+  static bool _scanning = false;
 
   static void start(Client client) {
     final me = client.userID;
     if (me == null) return;
-    if (_started.contains(me)) return;
-    _started.add(me);
+    if (_subs.containsKey(me)) return;
     final service = FriendsService(client);
     unawaited(service.ensureDirectRooms());
     unawaited(service.syncFromRooms());
-    _sub = client.onSync.stream.listen((_) {
-      unawaited(service.syncFromRooms());
-    });
+    _subs[me] = client.onSync.stream.listen((_) => _throttledScan(service));
   }
 
+  /// 每个 sync 都全量扫房间太浪费，5 秒内只扫一次。
+  static void _throttledScan(FriendsService service) {
+    if (_scanning) return;
+    final now = DateTime.now();
+    if (now.difference(_lastScan) < const Duration(seconds: 5)) return;
+    _lastScan = now;
+    _scanning = true;
+    unawaited(
+      service.syncFromRooms().whenComplete(() => _scanning = false),
+    );
+  }
+
+  /// 通讯录下拉刷新用：无视节流，立刻扫一次。
+  static Future<void> scanNow(Client client) =>
+      FriendsService(client).syncFromRooms();
+
   static void stop() {
-    _sub?.cancel();
-    _sub = null;
+    for (final sub in _subs.values) {
+      sub.cancel();
+    }
+    _subs.clear();
     _started.clear();
   }
 }

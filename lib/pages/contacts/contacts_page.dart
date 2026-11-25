@@ -42,6 +42,13 @@ class _ContactsPageState extends State<ContactsPage> {
     }
   }
 
+  /// 下拉刷新：无视节流立刻扫一次房间，把对方「已接受」的申请捞回来。
+  Future<void> _refresh() async {
+    final client = Matrix.of(context).client;
+    await FriendsSync.scanNow(client);
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -69,8 +76,11 @@ class _ContactsPageState extends State<ContactsPage> {
               (a, b) =>
                   a.title.toLowerCase().compareTo(b.title.toLowerCase()),
             );
-          return ListView(
-            children: [
+          return RefreshIndicator(
+            onRefresh: _refresh,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
               ListTile(
                 leading: const Icon(Icons.person_add_alt_1_outlined),
                 title: Text(l10n.newFriends),
@@ -121,6 +131,7 @@ class _ContactsPageState extends State<ContactsPage> {
                   ),
                 ),
             ],
+            ),
           );
         },
       ),
