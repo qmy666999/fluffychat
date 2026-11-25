@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019-Present Christian Ku閼寸郸wski
+// SPDX-FileCopyrightText: 2019-Present Christian Ku鑴給wski
 // SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -143,7 +143,7 @@ abstract class AppRoutes {
       pageBuilder: (context, state) =>
           defaultPageBuilder(context, state, const DiscoverPage()),
     ),
-    // 闁哄牆顑呭鎼佸捶閸剛绐楅柛蹇嬪妼閻棙銇勯悽鍛婃〃闁挎稑鏈弲鐘诲箛韫囧海鐟濋柡鈧幆褏淇洪梺顔哄妼椤曢亶鎳滈搴ｇ閻庣懓鍟Σ鍛婄鎼粹€崇岛闁绘粈鍗抽妴澶愭倷绾懐绠婚柡澶堝劤濞堟垹鈧稒鍔欓妴澶愭椤喚绀嗛柕?
+    // 朋友圈：全屏页面，故意不放底部导航（它是从发现页点进来的子页面）。
     GoRoute(
       path: '/moments',
       pageBuilder: (context, state) =>
@@ -364,8 +364,8 @@ abstract class AppRoutes {
                           ),
                           redirect: loggedOutRedirect,
                         ),
-                        // 闁靛棗鏈崸濠囧礉閻樺搫顦╅柟瀛樼仛閳ь剙绉风换鏍级閳ュ啿寮抽柛娆欑导缁″啰鎲版担钘夊幋閺夆晜绋戠花鏌ユ偨閵娿儱鏁舵繛澶堝妼閸炶姤銇勭喊澶岀
-                        // 闁告熬绠戦崹顖炲椽?/rooms/settings/login 闁哄嫷鍨伴幃鎾寸▔閳ь剛鐚鹃懡銈呯箒閻犱警鍨抽弫閬嶆儍閸曨垱鏅╅悹鍥跺灛閳?
+                        // 「添加账户」这条入口也要能进应用内注册页，
+                        // 否则和 /rooms/settings/login 是同一类缺路由的错误。
                         GoRoute(
                           path: 'register',
                           pageBuilder: (context, state) => defaultPageBuilder(

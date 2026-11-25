@@ -4,17 +4,20 @@
 
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/utils/avatar_image.dart';
+import 'package:fluffychat/utils/file_selector.dart';
 import 'package:fluffychat/utils/moments/moments_service.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
-import 'package:fluffychat/widgets/mxc_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
+import 'moment_image.dart';
 import 'moment_model.dart';
 
 /// 朋友圈：全屏页面，**没有底部导航**。
@@ -288,40 +291,91 @@ class _MomentsPageState extends State<MomentsPage> {
     final userId = client.userID ?? '';
     final name = _nameOf(userId);
     final avatar = _avatarOf(userId);
-    return SizedBox(
-      height: 260,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // 封面图：规格里说取账号数据，这里先用主题色占位。
-          Container(color: theme.colorScheme.primaryContainer),
-          Positioned(
-            right: 16,
-            bottom: 12,
-            child: Row(
-              children: [
-                Text(
-                  name,
-                  style: TextStyle(
-                    color: theme.colorScheme.onPrimaryContainer,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
+    final cover = _service.coverImage;
+
+    return GestureDetector(
+      onTap: _changeCover,
+      child: SizedBox(
+        height: 300,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (cover != null)
+              MomentImage(uri: cover, fit: BoxFit.cover)
+            else
+              // 默认封面：主题色渐变 + 相机图标，别用纯色块。
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      theme.colorScheme.primary,
+                      theme.colorScheme.primary.withValues(alpha: 0.6),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                Avatar(
-                  mxContent: avatar,
-                  name: name,
-                  size: 56,
-                  // 方形圆角，不是圆形
-                  borderRadius: BorderRadius.circular(8),
+                child: Center(
+                  child: Icon(
+                    Icons.photo_camera_outlined,
+                    size: 40,
+                    color: Colors.white.withValues(alpha: 0.5),
+                  ),
                 ),
-              ],
+              ),
+            Positioned(
+              right: 16,
+              bottom: 12,
+              child: Row(
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      shadows: [Shadow(blurRadius: 4, color: Colors.black54)],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Avatar(
+                    mxContent: avatar,
+                    name: name,
+                    size: 56,
+                    // 方形圆角，不是圆形
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  /// 点封面换图：选图 → 转 JPEG（HEIC 也不会变灰）→ 上传 → 写账号数据。
+  Future<void> _changeCover() async {
+    final l10n = L10n.of(context);
+    final files = await selectFiles(context, type: FileType.image);
+    final file = files.isEmpty ? null : files.first;
+    if (file == null) return;
+    try {
+      final bytes = prepareImageBytes(await file.readAsBytes(), maxSide: 1600);
+      await _service.setCover(bytes);
+      if (!mounted) return;
+      setState(() {});
+    } on UnsupportedAvatarFormat {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.avatarUnsupportedFormat)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
+    }
   }
 }
 
@@ -494,13 +548,10 @@ class _ImageGrid extends StatelessWidget {
         mainAxisSpacing: 4,
       ),
       itemCount: shown.length,
-      itemBuilder: (context, i) => ClipRRect(
+      itemBuilder: (context, i) => MomentImage(
+        uri: Uri.tryParse(shown[i]),
+        fit: BoxFit.cover,
         borderRadius: BorderRadius.circular(4),
-        child: MxcImage(
-          uri: Uri.tryParse(shown[i]),
-          fit: BoxFit.cover,
-          isThumbnail: true,
-        ),
       ),
     );
   }

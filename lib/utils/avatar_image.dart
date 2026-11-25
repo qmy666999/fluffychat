@@ -21,15 +21,19 @@ class UnsupportedAvatarFormat implements Exception {
 ///
 /// 从相册选的照片经常是 HEIC，`package:image` 解不了 HEIC，会抛
 /// [UnsupportedAvatarFormat]，由界面提示用户换一张。
-Uint8List prepareAvatarBytes(Uint8List bytes) {
+Uint8List prepareAvatarBytes(Uint8List bytes) =>
+    prepareImageBytes(bytes, maxSide: 512);
+
+/// 把任意可解码图片转成 JPEG，最长边 [maxSide]（朋友圈封面用 1600）。
+Uint8List prepareImageBytes(Uint8List bytes, {int maxSide = 512}) {
   final decoded = img.decodeImage(bytes);
   if (decoded == null) throw const UnsupportedAvatarFormat();
 
-  final needsResize = decoded.width > 512 || decoded.height > 512;
+  final needsResize = decoded.width > maxSide || decoded.height > maxSide;
   final image = needsResize
       ? (decoded.width >= decoded.height
-            ? img.copyResize(decoded, width: 512)
-            : img.copyResize(decoded, height: 512))
+            ? img.copyResize(decoded, width: maxSide)
+            : img.copyResize(decoded, height: maxSide))
       : decoded;
 
   return img.encodeJpg(image, quality: 88);

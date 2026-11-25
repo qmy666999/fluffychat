@@ -16,6 +16,7 @@ import '../friends/friends_service.dart';
 class MomentsService {
   static const momentEventType = 'com.dafeiyu.moment';
   static const configEventType = 'com.dafeiyu.moments_config';
+  static const coverEventType = 'com.dafeiyu.moments_cover';
   static const roomName = '朋友圈';
 
   final Client client;
@@ -28,6 +29,27 @@ class MomentsService {
   String? get roomId => _config['room_id'] as String?;
 
   int get lastSeenTs => (_config['last_seen_ts'] as num?)?.toInt() ?? 0;
+
+  /// 自定义封面（账号数据 com.dafeiyu.moments_cover），没有就返回 null。
+  Uri? get coverImage {
+    final image = client.accountData[coverEventType]?.content['image'];
+    if (image is! String || image.isEmpty) return null;
+    return Uri.tryParse(image);
+  }
+
+  Future<void> setCover(Uint8List bytes) async {
+    final userId = client.userID;
+    if (userId == null) return;
+    final mxc = await client.uploadContent(
+      bytes,
+      filename: 'cover.jpg',
+      contentType: 'image/jpeg',
+    );
+    await client.setAccountData(userId, coverEventType, {
+      'image': mxc.toString(),
+      'updated_at': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
 
   Room? get room {
     final id = roomId;
