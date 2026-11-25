@@ -255,6 +255,18 @@ class LoginController extends State<Login> {
 
   static int sendAttempt = 0;
 
+  /// Opens the account registration page for the same homeserver.
+  void openRegister() {
+    final pathSegments = List.of(
+      GoRouter.of(context).routeInformationProvider.value.uri.pathSegments,
+    );
+    if (pathSegments.isNotEmpty && pathSegments.last != 'home') {
+      pathSegments.removeLast();
+    }
+    pathSegments.add('register');
+    context.push('/${pathSegments.join('/')}', extra: widget.client);
+  }
+
   @override
   void dispose() {
     usernameController.dispose();

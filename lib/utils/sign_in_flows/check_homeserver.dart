@@ -16,7 +16,6 @@ import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
-import 'package:url_launcher/url_launcher_string.dart';
 
 Future<void> connectToHomeserverFlow(
   PublicHomeserverData homeserverData,
@@ -60,15 +59,13 @@ Future<void> connectToHomeserverFlow(
     } else if (supportsSso) {
       await ssoLoginFlow(client, context, signUp, loginFlows);
     } else {
-      if (signUp && regLink != null) {
-        await launchUrlString(regLink);
-      }
-      if (!context.mounted) return;
       final pathSegments = List.of(
         GoRouter.of(context).routeInformationProvider.value.uri.pathSegments,
       );
       if (pathSegments.last != 'home') pathSegments.removeLast();
-      pathSegments.add('login');
+      // The fork registers the account inside the app instead of forwarding to
+      // the registration website of the homeserver.
+      pathSegments.add(signUp ? 'register' : 'login');
       context.push('/${pathSegments.join('/')}', extra: client);
       setState(AsyncSnapshot.withData(ConnectionState.done, true));
       return;

@@ -66,7 +66,10 @@ android {
     }
 
     defaultConfig {
-        applicationId = "chat.fluffy.fluffychat"
+        // Fork builds use a separate application id so that they can be
+        // installed next to the official FluffyChat build. Same application id
+        // means same signature needed, which the official build has.
+        applicationId = "chat.fluffy.fluffychat.reg"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

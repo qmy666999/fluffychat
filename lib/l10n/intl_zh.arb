@@ -2863,5 +2863,28 @@
                 "type": "String"
             }
         }
-    }
+    },
+    "registerUsernameLabel": "用户名",
+    "registerUsernameHint": "只能使用小写英文字母、数字和 _ . - = /",
+    "registerUsernameInvalid": "用户名只能包含小写英文字母、数字和 _ . - = /",
+    "registerUsernameTaken": "这个用户名已经被占用了",
+    "registerPasswordLabel": "密码",
+    "registerPasswordConfirmLabel": "确认密码",
+    "registerPasswordsDoNotMatch": "两次输入的密码不一致",
+    "registerPasswordTooShort": "密码至少要 {length} 位",
+    "@registerPasswordTooShort": {
+        "placeholders": {
+            "length": {
+                "type": "int"
+            }
+        }
+    },
+    "registerButton": "注册",
+    "registerServerLabel": "服务器",
+    "registerRegistrationDisabled": "这个服务器没有开放注册",
+    "registerUnsupportedAuth": "这个服务器需要额外的验证（例如验证码），本应用暂时不支持。请改用该服务器的网页注册。",
+    "registerWeakPassword": "服务器认为这个密码太弱，请换一个",
+    "registerRateLimited": "尝试次数太多了，请稍等一下再试",
+    "registerAlreadyHaveAccount": "已经有账号了？去登录",
+    "registerNoAccount": "还没有账号？注册"
 }

@@ -132,6 +132,16 @@ class LoginView extends StatelessWidget {
                       child: Text(L10n.of(context).passwordForgotten),
                     ),
                   ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: TextButton(
+                    onPressed: controller.loading
+                        ? null
+                        : controller.openRegister,
+                    child: Text(L10n.of(context).registerNoAccount),
+                  ),
+                ),
                 const SizedBox(height: 16),
               ],
             ),

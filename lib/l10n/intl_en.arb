@@ -2863,5 +2863,28 @@
                 "type": "String"
             }
         }
-    }
+    },
+    "registerUsernameLabel": "Username",
+    "registerUsernameHint": "Only lowercase letters, digits and _ . - = / are allowed",
+    "registerUsernameInvalid": "A username may only contain lowercase letters, digits and _ . - = /",
+    "registerUsernameTaken": "This username is already taken",
+    "registerPasswordLabel": "Password",
+    "registerPasswordConfirmLabel": "Confirm password",
+    "registerPasswordsDoNotMatch": "The passwords do not match",
+    "registerPasswordTooShort": "Please use at least {length} characters",
+    "@registerPasswordTooShort": {
+        "placeholders": {
+            "length": {
+                "type": "int"
+            }
+        }
+    },
+    "registerButton": "Create account",
+    "registerServerLabel": "Server",
+    "registerRegistrationDisabled": "This server does not allow registrations",
+    "registerUnsupportedAuth": "This server requires a different kind of verification (for example a captcha) which this app does not support yet. Please create the account on the website of the server instead.",
+    "registerWeakPassword": "The server rejected this password as too weak",
+    "registerRateLimited": "Too many attempts. Please wait a moment and try again",
+    "registerAlreadyHaveAccount": "Already have an account? Sign in",
+    "registerNoAccount": "No account yet? Register"
 }

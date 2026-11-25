@@ -119,6 +119,11 @@ hooks:
   user_defines:
     sqlite3:
       source: sqlcipher
+      # Fork build note (see FORK_NOTES.md): the prebuilt SQLCipher library is
+      # downloaded from a GitHub release, which is unreachable from this
+      # network, so it is fetched through a GitHub mirror instead. Remove this
+      # line when building behind a proxy or on a network with GitHub access.
+      url_pattern: https://gh-proxy.com/https://github.com/simolus3/sqlite3.dart/releases/download/$RELEASE_TAG/$FILENAME
 
 flutter_launcher_icons:
   image_path: assets/logo/img/logo.png
