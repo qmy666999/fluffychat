@@ -56,9 +56,9 @@ Future<void> startMatrixScan(BuildContext context) async {
       }
       break;
     case MatrixQrType.unknown:
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.scanInvalidQr)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.scanInvalidQr)));
       break;
   }
 }

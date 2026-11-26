@@ -98,9 +98,9 @@ class _AddFriendPageState extends State<AddFriendPage> {
     try {
       await _service.sendFriendRequest(profile.userId, message);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.friendRequestSent)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.friendRequestSent)));
       setState(() {});
     } catch (e) {
       if (!mounted) return;
@@ -181,7 +181,8 @@ class _AddFriendPageState extends State<AddFriendPage> {
                       final profile = results[i];
                       final isFriend = data.isFriend(profile.userId);
                       final title =
-                          profile.displayName ?? profile.userId.localpart ??
+                          profile.displayName ??
+                          profile.userId.localpart ??
                           profile.userId;
                       return ListTile(
                         leading: Avatar(

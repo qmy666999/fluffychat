@@ -76,68 +76,69 @@ class _ContactsPageState extends State<ContactsPage> {
         builder: (context, _) {
           final data = service.load();
           // 好友列表里不能出现自己。
-          final friends = data.friends
-              .where((friend) => friend.userId != client.userID)
-              .toList()
-            ..sort(
-              (a, b) =>
-                  a.title.toLowerCase().compareTo(b.title.toLowerCase()),
-            );
+          final friends =
+              data.friends
+                  .where((friend) => friend.userId != client.userID)
+                  .toList()
+                ..sort(
+                  (a, b) =>
+                      a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+                );
           return RefreshIndicator(
             onRefresh: _refresh,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               children: [
-              ListTile(
-                leading: const Icon(Icons.person_add_alt_1_outlined),
-                title: Text(l10n.newFriends),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (data.pendingCount > 0)
-                      Badge(
-                        label: Text(data.pendingCount.toString()),
-                      ),
-                    const Icon(Icons.chevron_right_outlined),
-                  ],
-                ),
-                onTap: () => context.push('/contacts/new'),
-              ),
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Text(
-                  l10n.friendsSection,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              if (friends.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(
-                    l10n.noFriendsYet,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                ),
-              for (final friend in friends)
                 ListTile(
-                  leading: Avatar(
-                    mxContent: _parseUri(friend.avatarUrl),
-                    name: friend.title,
-                    size: Avatar.defaultSize * 0.9,
+                  leading: const Icon(Icons.person_add_alt_1_outlined),
+                  title: Text(l10n.newFriends),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (data.pendingCount > 0)
+                        Badge(label: Text(data.pendingCount.toString())),
+                      const Icon(Icons.chevron_right_outlined),
+                    ],
                   ),
-                  title: Text(friend.title, maxLines: 1),
-                  // 好友行只显示名字，不显示 Matrix ID（ID 在资料页里看）
-                  trailing: const Icon(Icons.chat_bubble_outline),
-                  onTap: () => _openChat(friend.userId),
-                  onLongPress: () => context.push(
-                    '/contacts/friend?userId=${Uri.encodeComponent(friend.userId)}',
+                  onTap: () => context.push('/contacts/new'),
+                ),
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Text(
+                    l10n.friendsSection,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
-            ],
+                if (friends.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      l10n.noFriendsYet,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                for (final friend in friends)
+                  ListTile(
+                    leading: Avatar(
+                      mxContent: _parseUri(friend.avatarUrl),
+                      name: friend.title,
+                      size: Avatar.defaultSize * 0.9,
+                    ),
+                    title: Text(friend.title, maxLines: 1),
+                    // 好友行只显示名字，不显示 Matrix ID（ID 在资料页里看）
+                    trailing: const Icon(Icons.chat_bubble_outline),
+                    onTap: () => _openChat(friend.userId),
+                    onLongPress: () => context.push(
+                      '/contacts/friend?userId=${Uri.encodeComponent(friend.userId)}',
+                    ),
+                  ),
+              ],
             ),
           );
         },

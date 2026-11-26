@@ -27,7 +27,8 @@ class ChatAddMenuButton extends StatelessWidget {
 
 /// 打开宫格面板，选中后执行对应动作。
 ///
-/// 1 对 1 房间多出「语音通话 / 视频通话」两项；群聊里不显示。
+/// 入口的闭包捕获的是聊天页的 context（面板已关闭，用面板自己的 context 会
+/// 拿不到 ScaffoldMessenger），所以列表在这里构建，面板只负责展示和回传。
 Future<void> showChatAddMenu(
   BuildContext context,
   ChatController controller,
@@ -36,15 +37,80 @@ Future<void> showChatAddMenu(
   final canCall =
       room.membership == Membership.join &&
       room.summary.mJoinedMemberCount == 2;
+  final entries = _buildEntries(context, controller, canCall);
   final entry = await showModalBottomSheet<_AddMenuEntry>(
     context: context,
     useRootNavigator: true,
     showDragHandle: true,
-    builder: (context) =>
-        _ChatAddMenuSheet(controller: controller, canCall: canCall),
+    builder: (context) => _ChatAddMenuSheet(entries: entries),
   );
   if (entry == null) return;
   entry.onAction();
+}
+
+List<_AddMenuEntry> _buildEntries(
+  BuildContext context,
+  ChatController controller,
+  bool canCall,
+) {
+  final l10n = L10n.of(context);
+  void select(AddPopupMenuActions action) =>
+      controller.onAddPopupMenuButtonSelected(action);
+
+  return <_AddMenuEntry>[
+    _AddMenuEntry(
+      icon: Icons.image_outlined,
+      label: l10n.sendImage,
+      onAction: () => select(AddPopupMenuActions.image),
+    ),
+    if (PlatformInfos.isMobile)
+      _AddMenuEntry(
+        icon: Icons.camera_alt_outlined,
+        label: l10n.takeAPhoto,
+        onAction: () => select(AddPopupMenuActions.photoCamera),
+      ),
+    if (PlatformInfos.isMobile)
+      _AddMenuEntry(
+        icon: Icons.gps_fixed_outlined,
+        label: l10n.shareLocation,
+        onAction: () => select(AddPopupMenuActions.location),
+      ),
+    _AddMenuEntry(
+      icon: Icons.attachment_outlined,
+      label: l10n.sendFile,
+      onAction: () => select(AddPopupMenuActions.file),
+    ),
+    if (PlatformInfos.isMobile)
+      _AddMenuEntry(
+        icon: Icons.videocam_outlined,
+        label: l10n.recordAVideo,
+        onAction: () => select(AddPopupMenuActions.videoCamera),
+      ),
+    _AddMenuEntry(
+      icon: Icons.movie_outlined,
+      label: l10n.sendVideo,
+      onAction: () => select(AddPopupMenuActions.video),
+    ),
+    _AddMenuEntry(
+      icon: Icons.poll_outlined,
+      label: l10n.startPoll,
+      onAction: () => select(AddPopupMenuActions.poll),
+    ),
+    if (canCall) ...[
+      _AddMenuEntry(
+        icon: Icons.call_outlined,
+        label: l10n.callVoice,
+        onAction: () =>
+            startChatCall(context, controller.room, CallType.kVoice),
+      ),
+      _AddMenuEntry(
+        icon: Icons.videocam_outlined,
+        label: l10n.callVideo,
+        onAction: () =>
+            startChatCall(context, controller.room, CallType.kVideo),
+      ),
+    ],
+  ];
 }
 
 class _AddMenuEntry {
@@ -60,82 +126,13 @@ class _AddMenuEntry {
 }
 
 class _ChatAddMenuSheet extends StatelessWidget {
-  const _ChatAddMenuSheet({required this.controller, required this.canCall});
+  const _ChatAddMenuSheet({required this.entries});
 
-  final ChatController controller;
-  final bool canCall;
+  final List<_AddMenuEntry> entries;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = L10n.of(context);
     final theme = Theme.of(context);
-    final controller = this.controller;
-
-    final entries = <_AddMenuEntry>[
-      _AddMenuEntry(
-        icon: Icons.image_outlined,
-        label: l10n.sendImage,
-        onAction: () =>
-            controller.onAddPopupMenuButtonSelected(AddPopupMenuActions.image),
-      ),
-      if (PlatformInfos.isMobile)
-        _AddMenuEntry(
-          icon: Icons.camera_alt_outlined,
-          label: l10n.takeAPhoto,
-          onAction: () => controller.onAddPopupMenuButtonSelected(
-            AddPopupMenuActions.photoCamera,
-          ),
-        ),
-      if (PlatformInfos.isMobile)
-        _AddMenuEntry(
-          icon: Icons.gps_fixed_outlined,
-          label: l10n.shareLocation,
-          onAction: () => controller.onAddPopupMenuButtonSelected(
-            AddPopupMenuActions.location,
-          ),
-        ),
-      _AddMenuEntry(
-        icon: Icons.attachment_outlined,
-        label: l10n.sendFile,
-        onAction: () =>
-            controller.onAddPopupMenuButtonSelected(AddPopupMenuActions.file),
-      ),
-      if (PlatformInfos.isMobile)
-        _AddMenuEntry(
-          icon: Icons.videocam_outlined,
-          label: l10n.recordAVideo,
-          onAction: () => controller.onAddPopupMenuButtonSelected(
-            AddPopupMenuActions.videoCamera,
-          ),
-        ),
-      _AddMenuEntry(
-        icon: Icons.movie_outlined,
-        label: l10n.sendVideo,
-        onAction: () =>
-            controller.onAddPopupMenuButtonSelected(AddPopupMenuActions.video),
-      ),
-      _AddMenuEntry(
-        icon: Icons.poll_outlined,
-        label: l10n.startPoll,
-        onAction: () =>
-            controller.onAddPopupMenuButtonSelected(AddPopupMenuActions.poll),
-      ),
-      if (canCall) ...[
-        _AddMenuEntry(
-          icon: Icons.call_outlined,
-          label: l10n.callVoice,
-          onAction: () =>
-              startChatCall(context, controller.room, CallType.kVoice),
-        ),
-        _AddMenuEntry(
-          icon: Icons.videocam_outlined,
-          label: l10n.callVideo,
-          onAction: () =>
-              startChatCall(context, controller.room, CallType.kVideo),
-        ),
-      ],
-    ];
-
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),

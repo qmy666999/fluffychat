@@ -59,18 +59,15 @@ class _MomentComposerPageState extends State<MomentComposerPage> {
     if (!_canPublish) return;
     setState(() => _publishing = true);
     try {
-      await _service.post(
-        text: _text.text.trim(),
-        images: _images,
-      );
+      await _service.post(text: _text.text.trim(), images: _images);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _publishing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 

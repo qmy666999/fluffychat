@@ -52,7 +52,10 @@ class ChatListBottomBar extends StatelessWidget {
                                 room.membership == Membership.join &&
                                 !moments.hidesRoom(room),
                           )
-                          .fold<int>(0, (sum, room) => sum + room.notificationCount);
+                          .fold<int>(
+                            0,
+                            (sum, room) => sum + room.notificationCount,
+                          );
                       return Badge(
                         isLabelVisible: unread > 0,
                         label: Text(unread > 99 ? '99+' : unread.toString()),
@@ -70,7 +73,9 @@ class ChatListBottomBar extends StatelessWidget {
                   icon: StreamBuilder(
                     stream: client.onSync.stream,
                     builder: (context, _) {
-                      final pending = FriendsService(client).load().pendingCount;
+                      final pending = FriendsService(
+                        client,
+                      ).load().pendingCount;
                       return Badge(
                         isLabelVisible: pending > 0,
                         label: Text(pending > 99 ? '99+' : pending.toString()),

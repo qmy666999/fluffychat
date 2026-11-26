@@ -23,7 +23,8 @@ class _NewFriendsPageState extends State<NewFriendsPage> {
     try {
       await service.acceptRequest(request);
       if (!mounted) return;
-      final roomId = request.roomId ?? await service.openDirectChat(request.peer);
+      final roomId =
+          request.roomId ?? await service.openDirectChat(request.peer);
       if (!mounted) return;
       context.go('/rooms/$roomId');
     } catch (e) {
@@ -70,9 +71,7 @@ class _NewFriendsPageState extends State<NewFriendsPage> {
                   padding: const EdgeInsets.all(16),
                   child: Text(
                     l10n.noRequests,
-                    style: TextStyle(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                   ),
                 ),
               for (final request in incoming)
@@ -127,9 +126,7 @@ class _NewFriendsPageState extends State<NewFriendsPage> {
                   padding: const EdgeInsets.all(16),
                   child: Text(
                     l10n.noRequests,
-                    style: TextStyle(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                   ),
                 ),
               for (final request in outgoing)
@@ -147,9 +144,7 @@ class _NewFriendsPageState extends State<NewFriendsPage> {
                       FriendRequestStatus.accepted => l10n.statusAccepted,
                       FriendRequestStatus.rejected => l10n.statusRejected,
                     },
-                    style: TextStyle(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                   ),
                 ),
             ],

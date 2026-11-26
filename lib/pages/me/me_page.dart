@@ -39,7 +39,9 @@ class MePage extends StatelessWidget {
             builder: (context, snapshot) {
               final profile = snapshot.data;
               final name =
-                  profile?.displayName ?? userId.localpart ?? l10n.unknownDevice;
+                  profile?.displayName ??
+                  userId.localpart ??
+                  l10n.unknownDevice;
               return InkWell(
                 onTap: () => _showQr(context, userId, name),
                 child: Padding(

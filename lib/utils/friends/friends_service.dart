@@ -108,9 +108,8 @@ class FriendRequestEntry {
             as String,
     message: (json['message'] ?? '') as String? ?? '',
     peerName:
-        ((incoming ? json['from_name'] : json['to_name']) ??
-            json['peer_name'])
-        as String?,
+        ((incoming ? json['from_name'] : json['to_name']) ?? json['peer_name'])
+            as String?,
     avatarUrl: json['avatar_url'] as String?,
     ts: (json['ts'] as num?)?.toInt() ?? 0,
     roomId: json['room_id'] as String?,
@@ -151,9 +150,8 @@ class FriendsData {
        incoming = incoming ?? [],
        outgoing = outgoing ?? [];
 
-  int get pendingCount => incoming
-      .where((r) => r.status == FriendRequestStatus.pending)
-      .length;
+  int get pendingCount =>
+      incoming.where((r) => r.status == FriendRequestStatus.pending).length;
 
   FriendEntry? friend(String userId) {
     for (final f in friends) {
@@ -384,8 +382,7 @@ class FriendsService {
   /// 接受：自己名单加人 → 标 accepted → 房间标私聊 → 回一条 accept 事件。
   Future<void> acceptRequest(FriendRequestEntry request) async {
     final me = client.userID!;
-    final roomId =
-        request.roomId ?? await openDirectChat(request.peer);
+    final roomId = request.roomId ?? await openDirectChat(request.peer);
 
     await addFriend(
       FriendEntry(
@@ -618,9 +615,7 @@ class FriendsSync {
     if (now.difference(_lastScan) < const Duration(seconds: 5)) return;
     _lastScan = now;
     _scanning = true;
-    unawaited(
-      service.syncFromRooms().whenComplete(() => _scanning = false),
-    );
+    unawaited(service.syncFromRooms().whenComplete(() => _scanning = false));
   }
 
   /// 通讯录下拉刷新用：无视节流，立刻扫一次。

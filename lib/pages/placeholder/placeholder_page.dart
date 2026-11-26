@@ -34,11 +34,7 @@ class PlaceholderPage extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 64,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+            Icon(icon, size: 64, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(height: 16),
             Text(l10n.comingSoon, textAlign: TextAlign.center),
           ],

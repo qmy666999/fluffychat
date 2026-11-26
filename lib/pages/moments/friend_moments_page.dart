@@ -123,9 +123,7 @@ class _FriendMomentsPageState extends State<FriendMomentsPage> {
                   child: Text(
                     l10n.noMomentsForFriend,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                   ),
                 ),
               ),

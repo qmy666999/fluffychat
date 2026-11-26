@@ -127,9 +127,7 @@ class SettingsController extends State<Settings> {
       final result = await selectFiles(context, type: FileType.image);
       final pickedFile = result.firstOrNull;
       if (pickedFile == null) return;
-      final avatarBytes = await _prepareAvatar(
-        await pickedFile.readAsBytes(),
-      );
+      final avatarBytes = await _prepareAvatar(await pickedFile.readAsBytes());
       if (avatarBytes == null) return;
       file = MatrixFile(
         bytes: avatarBytes,

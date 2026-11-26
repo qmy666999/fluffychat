@@ -39,8 +39,7 @@ class NewGroupController extends State<NewGroup> {
   /// 建群时是否加密，默认跟着全局设置（默认不加密）。
   bool enableEncryption = AppSettings.encryptNewChats.value;
 
-  void toggleEncryption(bool value) =>
-      setState(() => enableEncryption = value);
+  void toggleEncryption(bool value) => setState(() => enableEncryption = value);
 
   Uint8List? avatar;
 

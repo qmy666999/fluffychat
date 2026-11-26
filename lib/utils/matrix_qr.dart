@@ -26,20 +26,23 @@ MatrixQrResult parseMatrixQr(String raw) {
   final text = raw.trim();
   if (text.isEmpty) return const MatrixQrResult(MatrixQrType.unknown);
 
-  final user = RegExp(r'@[A-Za-z0-9._=\-/]+:[A-Za-z0-9.\-]+(?::\d+)?')
-      .firstMatch(text);
+  final user = RegExp(
+    r'@[A-Za-z0-9._=\-/]+:[A-Za-z0-9.\-]+(?::\d+)?',
+  ).firstMatch(text);
   if (user != null) {
     return MatrixQrResult(MatrixQrType.user, user.group(0));
   }
 
-  final room = RegExp(r'![A-Za-z0-9]+:[A-Za-z0-9.\-]+(?::\d+)?')
-      .firstMatch(text);
+  final room = RegExp(
+    r'![A-Za-z0-9]+:[A-Za-z0-9.\-]+(?::\d+)?',
+  ).firstMatch(text);
   if (room != null) {
     return MatrixQrResult(MatrixQrType.room, room.group(0));
   }
 
-  final alias = RegExp(r'#[A-Za-z0-9._=\-/]+:[A-Za-z0-9.\-]+(?::\d+)?')
-      .firstMatch(text);
+  final alias = RegExp(
+    r'#[A-Za-z0-9._=\-/]+:[A-Za-z0-9.\-]+(?::\d+)?',
+  ).firstMatch(text);
   if (alias != null) {
     return MatrixQrResult(MatrixQrType.alias, alias.group(0));
   }

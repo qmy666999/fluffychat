@@ -98,8 +98,10 @@ class MomentsService {
     if (await _latestCoverEvent(userId) != null) return;
 
     final fromState = _legacyStateCover(userId)?.toString();
-    final fromAccountData = client.accountData[coverEventType]?.content['image'];
-    final image = fromState ??
+    final fromAccountData =
+        client.accountData[coverEventType]?.content['image'];
+    final image =
+        fromState ??
         (fromAccountData is String && fromAccountData.isNotEmpty
             ? fromAccountData
             : null);
@@ -126,9 +128,8 @@ class MomentsService {
     final momentsRoom = room;
     if (momentsRoom == null) return const [];
     final tl = await momentsRoom.getTimeline(limit: 40);
-    List<Event> mine() => momentEvents(
-      tl.events,
-    ).where((e) => e.senderId == userId).toList();
+    List<Event> mine() =>
+        momentEvents(tl.events).where((e) => e.senderId == userId).toList();
 
     var result = mine();
     var pages = 0;
@@ -282,10 +283,7 @@ class MomentsService {
   /// 好友名单里还没进房间的人，邀请一遍（只邀请，不强制）。
   Future<int> inviteMissingFriends(Room room) async {
     final friends = FriendsService(client).load().friends;
-    final joined = room
-        .getParticipants()
-        .map((p) => p.id)
-        .toSet();
+    final joined = room.getParticipants().map((p) => p.id).toSet();
     final missing = friends
         .map((f) => f.userId)
         .where((id) => !joined.contains(id))
@@ -353,7 +351,11 @@ class MomentsService {
     }, type: 'm.reaction');
   }
 
-  Future<void> unLike(Event moment, List<Event> events, {String key = '👍'}) async {
+  Future<void> unLike(
+    Event moment,
+    List<Event> events, {
+    String key = '👍',
+  }) async {
     for (final reaction in _reactions(events, moment)) {
       if (reaction.senderId == client.userID && reaction.key == key) {
         await reaction.event.redactEvent();
@@ -377,10 +379,9 @@ class MomentsService {
 
   // ------------------------------------------------------------ 事件聚合
 
-  static List<Event> momentEvents(List<Event> events) => events
-      .where((e) => e.type == momentEventType && !e.redacted)
-      .toList()
-    ..sort((a, b) => _ts(b).compareTo(_ts(a)));
+  static List<Event> momentEvents(List<Event> events) =>
+      events.where((e) => e.type == momentEventType && !e.redacted).toList()
+        ..sort((a, b) => _ts(b).compareTo(_ts(a)));
 
   static int _ts(Event e) =>
       (e.content['ts'] as num?)?.toInt() ??
@@ -412,35 +413,34 @@ class MomentsService {
           )
           .toList();
 
-  static List<String> reactions(List<Event> events, Event moment) => _reactions(
-    events,
-    moment,
-  ).map((r) => r.senderId).toSet().toList();
+  static List<String> reactions(List<Event> events, Event moment) =>
+      _reactions(events, moment).map((r) => r.senderId).toSet().toList();
 
-  static bool hasLiked(
-    List<Event> events,
-    Event moment,
-    String? userId,
-  ) => _reactions(events, moment).any((r) => r.senderId == userId);
+  static bool hasLiked(List<Event> events, Event moment, String? userId) =>
+      _reactions(events, moment).any((r) => r.senderId == userId);
 
   static List<MomentComment> comments(List<Event> events, Event moment) =>
-      events.where((e) {
-        if (e.redacted) return false;
-        if (e.type != 'm.room.message') return false;
-        final relates = e.content['m.relates_to'];
-        if (relates is! Map) return false;
-        // 兼容两种写法：新代码用 m.in_reply_to，老数据可能是 rel_type=m.thread
-        final inReplyTo = relates['m.in_reply_to'];
-        final target = relates['event_id'] ??
-            (inReplyTo is Map ? inReplyTo['event_id'] : null);
-        return target == moment.eventId;
-      }).map((e) {
-        return MomentComment(
-          senderId: e.senderId,
-          body: e.body,
-          ts: e.originServerTs.millisecondsSinceEpoch,
-        );
-      }).toList()
+      events
+          .where((e) {
+            if (e.redacted) return false;
+            if (e.type != 'm.room.message') return false;
+            final relates = e.content['m.relates_to'];
+            if (relates is! Map) return false;
+            // 兼容两种写法：新代码用 m.in_reply_to，老数据可能是 rel_type=m.thread
+            final inReplyTo = relates['m.in_reply_to'];
+            final target =
+                relates['event_id'] ??
+                (inReplyTo is Map ? inReplyTo['event_id'] : null);
+            return target == moment.eventId;
+          })
+          .map((e) {
+            return MomentComment(
+              senderId: e.senderId,
+              body: e.body,
+              ts: e.originServerTs.millisecondsSinceEpoch,
+            );
+          })
+          .toList()
         ..sort((a, b) => a.ts.compareTo(b.ts));
 }
 

@@ -278,8 +278,7 @@ class RedactionWidget extends StatelessWidget {
             L10n.of(context).user;
         final redactedById = event.redactedBecause?.senderId;
         final isOwn =
-            redactedById != null &&
-            redactedById == event.room.client.userID;
+            redactedById != null && redactedById == event.room.client.userID;
         return _ButtonContent(
           label: isOwn
               ? L10n.of(context).youUnsentAMessage
