@@ -198,6 +198,9 @@ class ChatListViewBody extends StatelessWidget {
                     final theme = Theme.of(context);
                     final l10n = L10n.of(context);
                     return SwipeActionRow(
+                      // 用房间 ID 当 key：列表滚动/重排时 Slidable 的展开状态
+                      // 不会串到别的会话上。
+                      itemKey: room.id,
                       actions: [
                         SwipeAction(
                           label: l10n.chatMenuMarkUnread,

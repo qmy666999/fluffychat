@@ -11,6 +11,7 @@ import 'package:fluffychat/config/routes.dart';
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/chat/active_call_banner.dart';
 import 'package:fluffychat/widgets/app_lock.dart';
 import 'package:fluffychat/widgets/layouts/call_overlay.dart';
 import 'package:fluffychat/widgets/theme_builder.dart';
@@ -117,13 +118,18 @@ class FluffyChatApp extends StatelessWidget {
           pincode: appLockSettings.pincode,
           useBiometrics: appLockSettings.useBiometrics,
           isLoggedIn: clients.any((client) => client.isLogged()),
-          // Need a navigator above the Matrix widget for
-          // displaying dialogs
-          child: Matrix(
-            clients: clients,
-            store: store,
-            child: CallOverlay(
-              child: testWidget ?? child ?? const SizedBox.shrink(),
+          // 全局通话横幅：挂在 Navigator 外面，所以切到通讯录、发现、我
+          // 这些页面时横幅也一直在。放在 AppLockWidget 里面，锁屏时它会被
+          // 锁屏界面盖住，不会泄露通话状态。
+          child: GlobalCallBannerHost(
+            // Need a navigator above the Matrix widget for
+            // displaying dialogs
+            child: Matrix(
+              clients: clients,
+              store: store,
+              child: CallOverlay(
+                child: testWidget ?? child ?? const SizedBox.shrink(),
+              ),
             ),
           ),
         ),

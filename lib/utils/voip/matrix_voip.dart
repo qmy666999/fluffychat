@@ -55,8 +55,16 @@ class MatrixVoip extends VoIP {
 
   static MatrixVoip? of(Client client) => _instances[client];
 
-  /// 通话页是否已经打开，避免重复 push。
-  static bool pageOpen = false;
+  /// 通话页是否显示在最前面。
+  ///
+  /// 用 [ValueNotifier] 而不是普通 bool，因为全局通话横幅要靠它决定「现在
+  /// 要不要显示」：用户点最小化把页面 pop 掉时，横幅必须立刻出现，不能等
+  /// 下一秒的计时器刷新。
+  static final ValueNotifier<bool> pageVisible = ValueNotifier(false);
+
+  static bool get pageOpen => pageVisible.value;
+
+  static set pageOpen(bool value) => pageVisible.value = value;
 
   /// 打开全屏通话页（主叫、来电、点「返回通话」都走这里）。
   static void openCallPage() {
