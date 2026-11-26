@@ -364,12 +364,13 @@ class MomentsService {
 
   Future<void> comment(Event moment, String text) async {
     final room = await ensureRoom();
+    // 用普通回复（m.in_reply_to）而不是 thread：
+    // thread 回复不会出现在主线时间线里，朋友圈也读不回来。
     await room.sendEvent({
       'msgtype': 'm.text',
       'body': text,
       'm.relates_to': {
-        'rel_type': 'm.thread',
-        'event_id': moment.eventId,
+        'm.in_reply_to': {'event_id': moment.eventId},
       },
     }, type: 'm.room.message');
   }
@@ -427,9 +428,12 @@ class MomentsService {
         if (e.redacted) return false;
         if (e.type != 'm.room.message') return false;
         final relates = e.content['m.relates_to'];
-        return relates is Map &&
-            relates['rel_type'] == 'm.thread' &&
-            relates['event_id'] == moment.eventId;
+        if (relates is! Map) return false;
+        // 兼容两种写法：新代码用 m.in_reply_to，老数据可能是 rel_type=m.thread
+        final inReplyTo = relates['m.in_reply_to'];
+        final target = relates['event_id'] ??
+            (inReplyTo is Map ? inReplyTo['event_id'] : null);
+        return target == moment.eventId;
       }).map((e) {
         return MomentComment(
           senderId: e.senderId,

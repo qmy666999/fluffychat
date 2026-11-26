@@ -2903,6 +2903,9 @@
     "scan": "Scan",
     "scanInvalidQr": "This is not a valid Matrix QR code",
     "scanJoinFailed": "Could not join: {error}",
+    "youUnsentAMessage": "You unsent a message",
+    "startGroupChat": "Start group chat",
+    "addFriend": "Add friend",
     "@scanJoinFailed": {
         "placeholders": {
             "error": {

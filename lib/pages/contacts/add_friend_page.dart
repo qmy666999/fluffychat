@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:async';
+
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
 import 'package:fluffychat/utils/scan_flow.dart';
@@ -30,6 +32,19 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   FriendsService get _service => FriendsService(Matrix.of(context).client);
 
+  Timer? _debounce;
+
+  /// 输入停顿 400ms 自动搜索（长度 ≥2 才搜，避免打一个字就请求）。
+  void _onQueryChanged(String value) {
+    _debounce?.cancel();
+    final term = value.trim();
+    if (term.length < 2) {
+      if (_results != null) setState(() => _results = null);
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 400), _search);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +57,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -126,6 +142,8 @@ class _AddFriendPageState extends State<AddFriendPage> {
               autofocus: true,
               textInputAction: TextInputAction.search,
               onSubmitted: (_) => _search(),
+              // 边打边搜：以前只有回车才搜，看起来像「搜不出东西」。
+              onChanged: _onQueryChanged,
               decoration: InputDecoration(
                 filled: true,
                 fillColor: theme.colorScheme.secondaryContainer,
@@ -135,6 +153,11 @@ class _AddFriendPageState extends State<AddFriendPage> {
                 ),
                 hintText: l10n.searchUsersHint,
                 prefixIcon: const Icon(Icons.search_outlined),
+                suffixIcon: IconButton(
+                  tooltip: l10n.search,
+                  icon: const Icon(Icons.arrow_forward),
+                  onPressed: _search,
+                ),
               ),
             ),
           ),

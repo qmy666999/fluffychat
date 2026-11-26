@@ -164,11 +164,11 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'group',
-                child: Text(L10n.of(context).createGroup),
+                child: Text(L10n.of(context).startGroupChat),
               ),
               PopupMenuItem(
                 value: 'friend',
-                child: Text(L10n.of(context).addToContacts),
+                child: Text(L10n.of(context).addFriend),
               ),
             ],
           ),

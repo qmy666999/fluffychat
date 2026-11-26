@@ -2903,6 +2903,9 @@
     "scan": "扫一扫",
     "scanInvalidQr": "这不是一个有效的 Matrix 二维码",
     "scanJoinFailed": "进入失败：{error}",
+    "youUnsentAMessage": "你撤回了一条消息",
+    "startGroupChat": "发起群聊",
+    "addFriend": "添加朋友",
     "@scanJoinFailed": {
         "placeholders": {
             "error": {

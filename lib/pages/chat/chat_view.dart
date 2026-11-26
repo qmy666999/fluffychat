@@ -140,7 +140,12 @@ class ChatView extends StatelessWidget {
                       tooltip: L10n.of(context).copyToClipboard,
                       onPressed: controller.copyEventsAction,
                     ),
-                    if (controller.canRedactSelectedEvents)
+                    if (controller.canRedactSelectedEvents &&
+                        // 只能撤回自己发的：管理员虽然有权删别人的，但界面上不给入口
+                        controller.selectedEvents.every(
+                          (event) =>
+                              event.senderId == controller.room.client.userID,
+                        ))
                       if (controller.selectedEvents.length == 1)
                         // 单条消息直接给文字按钮，比图标更容易看懂是「撤回」
                         TextButton(

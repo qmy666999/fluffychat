@@ -276,8 +276,14 @@ class RedactionWidget extends StatelessWidget {
             snapshot.data?.calcDisplayname() ??
             event.redactedBecause?.senderId.localpart ??
             L10n.of(context).user;
+        final redactedById = event.redactedBecause?.senderId;
+        final isOwn =
+            redactedById != null &&
+            redactedById == event.room.client.userID;
         return _ButtonContent(
-          label: reason == null
+          label: isOwn
+              ? L10n.of(context).youUnsentAMessage
+              : reason == null
               ? L10n.of(context).redactedBy(redactedBy)
               : L10n.of(context).redactedByBecause(redactedBy, reason),
           icon: '🗑️',
