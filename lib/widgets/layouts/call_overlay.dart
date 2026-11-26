@@ -6,8 +6,11 @@
 import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/pages/call/call_page.dart';
+import 'package:fluffychat/pages/voip/voip_call_page.dart';
+import 'package:fluffychat/utils/voip/matrix_voip.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:matrix/matrix.dart';
 
 class CallOverlay extends StatelessWidget {
   final Widget child;
@@ -15,6 +18,27 @@ class CallOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final voip = MatrixVoip.ensure(Matrix.of(context).client);
+    return ValueListenableBuilder<CallSession?>(
+      valueListenable: voip.activeCall,
+      builder: (context, call, _) {
+        final base = _elementCallOverlay(context);
+        if (call == null) return base;
+        // 1 对 1 mesh 通话优先，全屏盖住当前页面（来电时也在这里接）。
+        return Stack(
+          children: [
+            base,
+            Positioned.fill(
+              child: VoipCallPage(key: ValueKey(call.callId), voip: voip),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// 上游的 MatrixRTC / Element Call 浮层，保持原样。
+  Widget _elementCallOverlay(BuildContext context) {
     return ValueListenableBuilder(
       valueListenable: Matrix.of(context).activeCallRoomId,
       builder: (context, value, _) {

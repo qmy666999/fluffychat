@@ -15,6 +15,7 @@ import 'package:fluffychat/utils/notification_background_handler.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/push_helper.dart';
 import 'package:fluffychat/utils/uia_request_manager.dart';
+import 'package:fluffychat/utils/voip/matrix_voip.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/fluffy_chat_app.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -260,6 +261,7 @@ class MatrixState extends State<Matrix> {
           final loggedInWithMultipleClients = widget.clients.length > 1;
 
           _cancelSubs(c.clientName);
+          unawaited(MatrixVoip.of(c)?.dispose());
           widget.clients.remove(c);
           ClientManager.removeClientNameFromStore(c.clientName, store);
           InitWithRestoreExtension.deleteSessionBackup(name);
@@ -304,6 +306,8 @@ class MatrixState extends State<Matrix> {
         flutterLocalNotificationsPlugin,
       ),
     );
+    // 1 对 1 通话：每个客户端一个实例，负责信令、铃声和通话状态。
+    MatrixVoip.ensure(c);
   }
 
   void _cancelSubs(String name) {
@@ -422,6 +426,10 @@ class MatrixState extends State<Matrix> {
     onUiaRequest.clear();
 
     voiceMessageEventId.dispose();
+
+    for (final c in widget.clients) {
+      unawaited(MatrixVoip.of(c)?.dispose());
+    }
 
     super.dispose();
   }
