@@ -4,9 +4,11 @@
 
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/moments/moment_image.dart';
+import 'package:fluffychat/utils/fluffy_share.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
 import 'package:fluffychat/utils/moments/moments_service.dart';
 import 'package:fluffychat/utils/voip/call_actions.dart';
+import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
 import 'package:fluffychat/widgets/avatar.dart';
@@ -15,7 +17,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
-/// 好友资料页：备注、发消息、删除好友。
+/// 好友资料页：备注、发消息、音视频通话、删除好友。
 class FriendProfilePage extends StatefulWidget {
   final String userId;
 
@@ -23,6 +25,15 @@ class FriendProfilePage extends StatefulWidget {
 
   @override
   State<FriendProfilePage> createState() => _FriendProfilePageState();
+}
+
+enum _FriendMenuAction {
+  setRemark,
+  recommend,
+  star,
+  blacklist,
+  complain,
+  delete,
 }
 
 class _FriendProfilePageState extends State<FriendProfilePage> {
@@ -133,15 +144,135 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
     context.pop();
   }
 
+  Future<void> _recommend() async {
+    await FluffyShare.share('https://matrix.to/#/${widget.userId}', context);
+  }
+
+  Future<void> _toggleStar() async {
+    final starred = WechatPrefs.isStarred(widget.userId);
+    await WechatPrefs.setStarred(widget.userId, !starred);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _block() async {
+    final l10n = L10n.of(context);
+    final consent = await showOkCancelAlertDialog(
+      context: context,
+      title: l10n.addToBlacklist,
+      okLabel: l10n.ok,
+      isDestructive: true,
+    );
+    if (consent != OkCancelResult.ok) return;
+    if (!mounted) return;
+    final client = Matrix.of(context).client;
+    try {
+      await client.ignoreUser(widget.userId);
+    } catch (e) {
+      debugPrint('[friends] ignore failed: $e');
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.addToBlacklist)));
+  }
+
+  void _complain() {
+    final l10n = L10n.of(context);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.complainThanks)));
+  }
+
+  Future<void> _pickCall() async {
+    final l10n = L10n.of(context);
+    final type = await showModalBottomSheet<CallType>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.call_outlined),
+              title: Text(l10n.callVoice),
+              onTap: () => Navigator.of(context).pop(CallType.kVoice),
+            ),
+            ListTile(
+              leading: const Icon(Icons.videocam_outlined),
+              title: Text(l10n.callVideo),
+              onTap: () => Navigator.of(context).pop(CallType.kVideo),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (type == null || !mounted) return;
+    await _startCall(type);
+  }
+
+  Future<void> _onMenu(_FriendMenuAction action) async {
+    switch (action) {
+      case _FriendMenuAction.setRemark:
+        await _setRemark();
+      case _FriendMenuAction.recommend:
+        await _recommend();
+      case _FriendMenuAction.star:
+        await _toggleStar();
+      case _FriendMenuAction.blacklist:
+        await _block();
+      case _FriendMenuAction.complain:
+        _complain();
+      case _FriendMenuAction.delete:
+        await _remove();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = L10n.of(context);
     final theme = Theme.of(context);
     final friend = _service.load().friend(widget.userId);
     final title = friend?.title ?? widget.userId;
+    final starred = WechatPrefs.isStarred(widget.userId);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.friendProfile)),
+      appBar: AppBar(
+        title: Text(l10n.friendProfile),
+        actions: [
+          PopupMenuButton<_FriendMenuAction>(
+            icon: const Icon(Icons.more_horiz),
+            onSelected: _onMenu,
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: _FriendMenuAction.setRemark,
+                child: Text(l10n.setRemarkAndTag),
+              ),
+              PopupMenuItem(
+                value: _FriendMenuAction.recommend,
+                child: Text(l10n.recommendToFriend),
+              ),
+              PopupMenuItem(
+                value: _FriendMenuAction.star,
+                child: Text(starred ? l10n.unstarFriend : l10n.starFriend),
+              ),
+              PopupMenuItem(
+                value: _FriendMenuAction.blacklist,
+                child: Text(l10n.addToBlacklist),
+              ),
+              PopupMenuItem(
+                value: _FriendMenuAction.complain,
+                child: Text(l10n.complain),
+              ),
+              PopupMenuItem(
+                value: _FriendMenuAction.delete,
+                child: Text(
+                  l10n.deleteFriend,
+                  style: TextStyle(color: theme.colorScheme.error),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: ListView(
         children: [
           const SizedBox(height: 24),
@@ -195,41 +326,29 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
             ),
             onTap: _openMoments,
           ),
-          ListTile(
-            leading: const Icon(Icons.chat_bubble_outline),
-            title: Text(l10n.sendMessage),
-            onTap: _sendMessage,
-          ),
-          ListTile(
-            leading: const Icon(Icons.call_outlined),
-            title: Text(l10n.callVoice),
-            onTap: () => _startCall(CallType.kVoice),
-          ),
-          ListTile(
-            leading: const Icon(Icons.videocam_outlined),
-            title: Text(l10n.callVideo),
-            onTap: () => _startCall(CallType.kVideo),
-          ),
-          ListTile(
-            leading: const Icon(Icons.edit_outlined),
-            title: Text(l10n.setRemark),
-            subtitle: Text(
-              (friend?.remark ?? '').isEmpty ? l10n.remarkHint : friend!.remark,
-            ),
-            onTap: _setRemark,
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.person_remove_outlined,
-              color: theme.colorScheme.error,
-            ),
-            title: Text(
-              l10n.removeFriend,
-              style: TextStyle(color: theme.colorScheme.error),
-            ),
-            onTap: _remove,
-          ),
         ],
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: _sendMessage,
+                  child: Text(l10n.sendMessage),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.tonal(
+                  onPressed: _pickCall,
+                  child: Text(l10n.audioVideoCall),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -88,6 +88,12 @@ class MePage extends StatelessWidget {
             onTap: () => context.push('/moments'),
           ),
           ListTile(
+            leading: const Icon(Icons.bookmark_border),
+            title: Text(l10n.favoritesEntry),
+            trailing: const Icon(Icons.chevron_right_outlined),
+            onTap: () => context.push('/me/favorites'),
+          ),
+          ListTile(
             leading: const Icon(Icons.person_add_alt_1_outlined),
             title: Text(l10n.newFriends),
             trailing: const Icon(Icons.chevron_right_outlined),

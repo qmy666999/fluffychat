@@ -11,6 +11,7 @@ import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/pages/archive/archive.dart';
 import 'package:fluffychat/pages/bootstrap/bootstrap_page.dart';
 import 'package:fluffychat/pages/chat/chat.dart';
+import 'package:fluffychat/pages/chat/chat_info_page.dart';
 import 'package:fluffychat/pages/chat_access_settings/chat_access_settings_controller.dart';
 import 'package:fluffychat/pages/chat_details/chat_details.dart';
 import 'package:fluffychat/pages/chat_encryption_settings/chat_encryption_settings.dart';
@@ -21,12 +22,15 @@ import 'package:fluffychat/pages/chat_search/chat_search_page.dart';
 import 'package:fluffychat/pages/contacts/add_friend_page.dart';
 import 'package:fluffychat/pages/contacts/contacts_page.dart';
 import 'package:fluffychat/pages/contacts/friend_profile_page.dart';
+import 'package:fluffychat/pages/contacts/groups_page.dart';
 import 'package:fluffychat/pages/contacts/new_friends_page.dart';
+import 'package:fluffychat/pages/contacts/tags_page.dart';
 import 'package:fluffychat/pages/device_settings/device_settings.dart';
 import 'package:fluffychat/pages/discover/discover_page.dart';
 import 'package:fluffychat/pages/intro/intro_page_presenter.dart';
 import 'package:fluffychat/pages/invitation_selection/invitation_selection.dart';
 import 'package:fluffychat/pages/login/login.dart';
+import 'package:fluffychat/pages/me/favorites_page.dart';
 import 'package:fluffychat/pages/me/me_page.dart';
 import 'package:fluffychat/pages/moments/friend_moments_page.dart';
 import 'package:fluffychat/pages/moments/moment_composer_page.dart';
@@ -34,7 +38,9 @@ import 'package:fluffychat/pages/moments/moments_page.dart';
 import 'package:fluffychat/pages/new_group/new_group.dart';
 import 'package:fluffychat/pages/new_private_chat/new_private_chat.dart';
 import 'package:fluffychat/pages/register/register.dart';
+import 'package:fluffychat/pages/settings/discover_manage_page.dart';
 import 'package:fluffychat/pages/settings/settings.dart';
+import 'package:fluffychat/pages/settings/wechat_settings_pages.dart';
 import 'package:fluffychat/pages/settings_3pid/settings_3pid.dart';
 import 'package:fluffychat/pages/settings_chat/settings_chat.dart';
 import 'package:fluffychat/pages/settings_emotes/settings_emotes.dart';
@@ -144,6 +150,16 @@ abstract class AppRoutes {
             ),
           ),
         ),
+        GoRoute(
+          path: 'groups',
+          pageBuilder: (context, state) =>
+              defaultPageBuilder(context, state, const GroupsPage()),
+        ),
+        GoRoute(
+          path: 'tags',
+          pageBuilder: (context, state) =>
+              defaultPageBuilder(context, state, const TagsPage()),
+        ),
       ],
     ),
     GoRoute(
@@ -155,6 +171,13 @@ abstract class AppRoutes {
       path: '/me',
       pageBuilder: (context, state) =>
           defaultPageBuilder(context, state, const MePage()),
+      routes: [
+        GoRoute(
+          path: 'favorites',
+          pageBuilder: (context, state) =>
+              defaultPageBuilder(context, state, const FavoritesPage()),
+        ),
+      ],
     ),
     // 1 对 1 语音/视频通话：全屏独立路由。
     GoRoute(
@@ -239,6 +262,16 @@ abstract class AppRoutes {
                   ),
           ),
           routes: [
+            // 微信式聊天信息页：右上「…」进来的整页设置。
+            GoRoute(
+              path: 'info',
+              pageBuilder: (context, state) => defaultPageBuilder(
+                context,
+                state,
+                ChatInfoPage(roomId: state.uri.queryParameters['roomId'] ?? ''),
+              ),
+              redirect: loggedOutRedirect,
+            ),
             GoRoute(
               path: 'archive',
               pageBuilder: (context, state) =>
@@ -333,6 +366,97 @@ abstract class AppRoutes {
                         context,
                         state,
                         const SettingsStyle(),
+                      ),
+                      redirect: loggedOutRedirect,
+                    ),
+                    // 微信式二级设置页
+                    GoRoute(
+                      path: 'wechat-account',
+                      pageBuilder: (context, state) => defaultPageBuilder(
+                        context,
+                        state,
+                        const SettingsAccountPage(),
+                      ),
+                      redirect: loggedOutRedirect,
+                    ),
+                    GoRoute(
+                      path: 'wechat-notifications',
+                      pageBuilder: (context, state) => defaultPageBuilder(
+                        context,
+                        state,
+                        const SettingsNotificationsPage(),
+                      ),
+                      redirect: loggedOutRedirect,
+                    ),
+                    GoRoute(
+                      path: 'wechat-chat',
+                      pageBuilder: (context, state) => defaultPageBuilder(
+                        context,
+                        state,
+                        const SettingsChatPage(),
+                      ),
+                      redirect: loggedOutRedirect,
+                    ),
+                    GoRoute(
+                      path: 'wechat-general',
+                      pageBuilder: (context, state) => defaultPageBuilder(
+                        context,
+                        state,
+                        const SettingsGeneralPage(),
+                      ),
+                      redirect: loggedOutRedirect,
+                    ),
+                    GoRoute(
+                      path: 'wechat-privacy',
+                      pageBuilder: (context, state) => defaultPageBuilder(
+                        context,
+                        state,
+                        const SettingsPrivacyPage(),
+                      ),
+                      redirect: loggedOutRedirect,
+                    ),
+                    GoRoute(
+                      path: 'wechat-friend-permission',
+                      pageBuilder: (context, state) => defaultPageBuilder(
+                        context,
+                        state,
+                        const SettingsFriendPermissionPage(),
+                      ),
+                      redirect: loggedOutRedirect,
+                    ),
+                    GoRoute(
+                      path: 'wechat-personal-info',
+                      pageBuilder: (context, state) => defaultPageBuilder(
+                        context,
+                        state,
+                        const SettingsPersonalInfoPage(),
+                      ),
+                      redirect: loggedOutRedirect,
+                    ),
+                    GoRoute(
+                      path: 'wechat-about',
+                      pageBuilder: (context, state) => defaultPageBuilder(
+                        context,
+                        state,
+                        const SettingsAboutPage(),
+                      ),
+                      redirect: loggedOutRedirect,
+                    ),
+                    GoRoute(
+                      path: 'wechat-help',
+                      pageBuilder: (context, state) => defaultPageBuilder(
+                        context,
+                        state,
+                        const SettingsHelpPage(),
+                      ),
+                      redirect: loggedOutRedirect,
+                    ),
+                    GoRoute(
+                      path: 'discover-manage',
+                      pageBuilder: (context, state) => defaultPageBuilder(
+                        context,
+                        state,
+                        const DiscoverManagePage(),
                       ),
                       redirect: loggedOutRedirect,
                     ),

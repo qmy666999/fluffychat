@@ -50,7 +50,9 @@ class ChatListBottomBar extends StatelessWidget {
                           .where(
                             (room) =>
                                 room.membership == Membership.join &&
-                                !moments.hidesRoom(room),
+                                !moments.hidesRoom(room) &&
+                                // 免打扰的会话只在该会话上显示红点，不进这个总数。
+                                room.pushRuleState == PushRuleState.notify,
                           )
                           .fold<int>(
                             0,

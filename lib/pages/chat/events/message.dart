@@ -921,7 +921,7 @@ class Message extends StatelessWidget {
                         color: theme.colorScheme.surface.withAlpha(128),
                       ),
                       child: Text(
-                        L10n.of(context).readUpToHere,
+                        L10n.of(context).newMessages,
                         style: TextStyle(fontSize: 11),
                       ),
                     ),

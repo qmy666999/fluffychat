@@ -5,12 +5,15 @@
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list_bottom_bar.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
+import 'package:fluffychat/utils/wechat/friend_tags_service.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lpinyin/lpinyin.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:matrix/matrix.dart';
 
-/// 通讯录：新的朋友 + 好友名单。
+/// 通讯录：新的朋友 / 群聊 / 标签 + 按拼音首字母分组的好友名单。
 class ContactsPage extends StatefulWidget {
   const ContactsPage({super.key});
 
@@ -20,6 +23,14 @@ class ContactsPage extends StatefulWidget {
 
 class _ContactsPageState extends State<ContactsPage> {
   bool _syncStarted = false;
+  final ScrollController _scrollController = ScrollController();
+  final Map<String, GlobalKey> _sectionKeys = {};
+  bool _draggingIndex = false;
+
+  static const List<String> _letters = [
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', //
+    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '#',
+  ];
 
   @override
   void didChangeDependencies() {
@@ -27,6 +38,12 @@ class _ContactsPageState extends State<ContactsPage> {
     if (_syncStarted) return;
     _syncStarted = true;
     FriendsSync.start(Matrix.of(context).client);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _openChat(String userId) async {
@@ -50,12 +67,40 @@ class _ContactsPageState extends State<ContactsPage> {
     if (mounted) setState(() {});
   }
 
+  GlobalKey _keyFor(String letter) =>
+      _sectionKeys.putIfAbsent(letter, GlobalKey.new);
+
+  Future<void> _scrollToLetter(String letter) async {
+    final context = _sectionKeys[letter]?.currentContext;
+    if (context == null) return;
+    await Scrollable.ensureVisible(
+      context,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+      alignment: 0,
+    );
+  }
+
+  void _onIndexDrag(Offset localPosition, double height) {
+    if (height <= 0) return;
+    final index = (localPosition.dy / height * _letters.length).floor().clamp(
+      0,
+      _letters.length - 1,
+    );
+    final letter = _letters[index];
+    // 只滚到真的有人存在的分组，避免拖过 # 之后一片空白。
+    if (_sectionKeys[letter]?.currentContext == null) return;
+    _scrollToLetter(letter);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = L10n.of(context);
     final client = Matrix.of(context).client;
     final service = FriendsService(client);
+    final tags = FriendTagsService(client).load();
+    final groupCount = client.rooms.where(_isGroupRoom).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -81,70 +126,241 @@ class _ContactsPageState extends State<ContactsPage> {
                   .where((friend) => friend.userId != client.userID)
                   .toList()
                 ..sort(
-                  (a, b) =>
-                      a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+                  (a, b) => _sortKey(a.title).compareTo(_sortKey(b.title)),
                 );
-          return RefreshIndicator(
-            onRefresh: _refresh,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.person_add_alt_1_outlined),
-                  title: Text(l10n.newFriends),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
+
+          final grouped = <String, List<FriendEntry>>{};
+          for (final friend in friends) {
+            grouped.putIfAbsent(_initial(friend.title), () => []).add(friend);
+          }
+          final existingLetters = [
+            for (final letter in _letters)
+              if (grouped[letter] != null) letter,
+          ];
+
+          return Stack(
+            children: [
+              RefreshIndicator(
+                onRefresh: _refresh,
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (data.pendingCount > 0)
-                        Badge(label: Text(data.pendingCount.toString())),
-                      const Icon(Icons.chevron_right_outlined),
+                      _entryTile(
+                        icon: Icons.person_add_alt_1_outlined,
+                        title: l10n.newFriends,
+                        badge: data.pendingCount > 0
+                            ? Badge(label: Text(data.pendingCount.toString()))
+                            : null,
+                        onTap: () => context.push('/contacts/new'),
+                      ),
+                      _entryTile(
+                        icon: Icons.groups_outlined,
+                        title: l10n.groupsEntry,
+                        trailingText: groupCount > 0 ? '$groupCount' : null,
+                        onTap: () => context.push('/contacts/groups'),
+                      ),
+                      _entryTile(
+                        icon: Icons.sell_outlined,
+                        title: l10n.tagsEntry,
+                        trailingText: tags.order.isEmpty
+                            ? null
+                            : '${tags.order.length}',
+                        onTap: () => context.push('/contacts/tags'),
+                      ),
+                      const Divider(height: 1),
+                      if (friends.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            l10n.noFriendsYet,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      for (final letter in existingLetters) ...[
+                        Container(
+                          key: _keyFor(letter),
+                          color: theme.colorScheme.surfaceContainerHigh,
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                          child: Text(
+                            letter,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        for (final friend in grouped[letter]!)
+                          ListTile(
+                            leading: Avatar(
+                              mxContent: _parseUri(friend.avatarUrl),
+                              name: friend.title,
+                              size: Avatar.defaultSize * 0.9,
+                            ),
+                            title: Text(friend.title, maxLines: 1),
+                            // 好友行只显示名字，不显示 Matrix ID（ID 在资料页里看）
+                            trailing: const Icon(Icons.chat_bubble_outline),
+                            onTap: () => context.push(
+                              '/contacts/friend?userId=${Uri.encodeComponent(friend.userId)}',
+                            ),
+                            // 长按直接进聊天，和微信「按住头像旁边的名字」一致。
+                            onLongPress: () => _openChat(friend.userId),
+                          ),
+                      ],
+                      const SizedBox(height: 24),
                     ],
                   ),
-                  onTap: () => context.push('/contacts/new'),
                 ),
-                const Divider(height: 1),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Text(
-                    l10n.friendsSection,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+              ),
+              if (existingLetters.isNotEmpty)
+                Positioned(
+                  top: 0,
+                  bottom: 0,
+                  right: 0,
+                  child: _IndexBar(
+                    letters: existingLetters,
+                    active: _draggingIndex,
+                    onChanged: _onIndexDrag,
+                    onDragState: (dragging) =>
+                        setState(() => _draggingIndex = dragging),
                   ),
                 ),
-                if (friends.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      l10n.noFriendsYet,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                for (final friend in friends)
-                  ListTile(
-                    leading: Avatar(
-                      mxContent: _parseUri(friend.avatarUrl),
-                      name: friend.title,
-                      size: Avatar.defaultSize * 0.9,
-                    ),
-                    title: Text(friend.title, maxLines: 1),
-                    // 好友行只显示名字，不显示 Matrix ID（ID 在资料页里看）
-                    trailing: const Icon(Icons.chat_bubble_outline),
-                    onTap: () => _openChat(friend.userId),
-                    onLongPress: () => context.push(
-                      '/contacts/friend?userId=${Uri.encodeComponent(friend.userId)}',
-                    ),
-                  ),
-              ],
-            ),
+            ],
           );
         },
       ),
     );
   }
+
+  Widget? _trailingText(BuildContext context, String? text) {
+    if (text == null) return null;
+    return Text(
+      text,
+      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+    );
+  }
+
+  bool _isGroupRoom(Room room) =>
+      room.membership == Membership.join && !room.isDirectChat && !room.isSpace;
+
+  Widget _entryTile({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Widget? badge,
+    String? trailingText,
+  }) {
+    final theme = Theme.of(context);
+    return ListTile(
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, size: 20, color: theme.colorScheme.primary),
+      ),
+      title: Text(title),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 8,
+        children: [
+          ?badge,
+          ?_trailingText(context, trailingText),
+          const Icon(Icons.chevron_right_outlined),
+        ],
+      ),
+      onTap: onTap,
+    );
+  }
+}
+
+/// 右侧竖排 A-Z 索引条：点或滑都能跳转。
+class _IndexBar extends StatelessWidget {
+  final List<String> letters;
+  final bool active;
+  final void Function(Offset localPosition, double height) onChanged;
+  final void Function(bool dragging) onDragState;
+
+  const _IndexBar({
+    required this.letters,
+    required this.active,
+    required this.onChanged,
+    required this.onDragState,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height = constraints.maxHeight;
+        void handle(Offset position) => onChanged(position, height);
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onVerticalDragStart: (details) {
+            onDragState(true);
+            handle(details.localPosition);
+          },
+          onVerticalDragUpdate: (details) => handle(details.localPosition),
+          onVerticalDragEnd: (_) => onDragState(false),
+          onVerticalDragCancel: () => onDragState(false),
+          onTapDown: (details) => handle(details.localPosition),
+          child: Container(
+            width: 24,
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (final letter in letters)
+                  SizedBox(
+                    height: 18,
+                    child: Center(
+                      child: Text(
+                        letter,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: active ? FontWeight.bold : null,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 拼音排序键：中文按拼音、英文按字母，数字和符号排最后。
+String _sortKey(String name) {
+  try {
+    return PinyinHelper.getPinyinE(
+      name,
+      separator: '',
+      defPinyin: '~',
+      format: PinyinFormat.WITHOUT_TONE,
+    ).toLowerCase();
+  } catch (_) {
+    return name.toLowerCase();
+  }
+}
+
+/// 分组首字母：A-Z，其它都进 #。
+String _initial(String name) {
+  final key = _sortKey(name);
+  if (key.isEmpty) return '#';
+  final first = key[0].toUpperCase();
+  if (first.codeUnitAt(0) >= 65 && first.codeUnitAt(0) <= 90) return first;
+  return '#';
 }
 
 Uri? _parseUri(String? value) =>

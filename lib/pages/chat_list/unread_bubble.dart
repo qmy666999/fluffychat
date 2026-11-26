@@ -14,42 +14,42 @@ class UnreadBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final unread = room.isUnreadOrInvited;
     final hasNotifications = room.notificationCount > 0;
-    final unreadBubbleSize = unread || room.hasNewMessages
-        ? room.notificationCount > 0
-              ? 20.0
-              : 14.0
-        : 0.0;
+    // 微信行为：免打扰的会话只显示红点，不显示数字。
+    final isMuted = room.pushRuleState != PushRuleState.notify;
+    final showNumber = hasNotifications && !isMuted;
+    final showDot =
+        !showNumber &&
+        (room.isUnread || room.hasNewMessages || room.markedUnread);
+    final unreadBubbleSize = showNumber ? 20.0 : 14.0;
+    final visible = showNumber || showDot;
     return AnimatedContainer(
       duration: FluffyThemes.animationDuration,
       curve: FluffyThemes.animationCurve,
       alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 7),
-      height: unreadBubbleSize,
-      width: !hasNotifications && !unread && !room.hasNewMessages
+      padding: EdgeInsets.symmetric(horizontal: showNumber ? 7 : 0),
+      height: visible ? unreadBubbleSize : 0,
+      width: !visible
           ? 0
-          : (unreadBubbleSize - 9) * room.notificationCount.toString().length +
-                9,
+          : showNumber
+          ? (unreadBubbleSize - 9) * room.notificationCount.toString().length +
+                9
+          : unreadBubbleSize,
       decoration: BoxDecoration(
         color: room.highlightCount > 0
             ? theme.colorScheme.error
-            : hasNotifications ||
-                  room.markedUnread ||
-                  room.membership == .invite
+            : showNumber
             ? theme.colorScheme.primary
-            : theme.colorScheme.primaryContainer,
+            : theme.colorScheme.primary,
         borderRadius: BorderRadius.circular(unreadBubbleSize),
       ),
-      child: hasNotifications || room.markedUnread
+      child: showNumber
           ? Text(
               room.notificationCount.toString(),
               style: TextStyle(
                 color: room.highlightCount > 0
                     ? theme.colorScheme.onError
-                    : hasNotifications
-                    ? theme.colorScheme.onPrimary
-                    : theme.colorScheme.onPrimaryContainer,
+                    : theme.colorScheme.onPrimary,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),

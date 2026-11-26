@@ -8,11 +8,14 @@ import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list.dart';
 import 'package:fluffychat/pages/chat_list/chat_list_item.dart';
+import 'package:fluffychat/pages/chat_list/chat_list_room_menu.dart';
 import 'package:fluffychat/pages/chat_list/dummy_chat_list_item.dart';
 import 'package:fluffychat/pages/chat_list/search_title.dart';
 import 'package:fluffychat/pages/chat_list/space_view.dart';
+import 'package:fluffychat/pages/chat_list/swipe_action_row.dart';
 import 'package:fluffychat/utils/stream_extension.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/public_room_dialog.dart';
+import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -192,15 +195,51 @@ class ChatListViewBody extends StatelessWidget {
                   itemBuilder: (BuildContext context, int i) {
                     final room = rooms[i];
                     final space = spaceDelegateCandidates[room.id];
-                    return ChatListItem(
-                      room,
-                      space: space,
-                      key: Key('chat_list_item_${room.id}'),
-                      filter: filter,
-                      onTap: () => controller.onChatTap(room),
-                      onLongPress: (context) =>
-                          controller.chatContextAction(room, context, space),
-                      activeChat: controller.activeChat == room.id,
+                    final theme = Theme.of(context);
+                    final l10n = L10n.of(context);
+                    return SwipeActionRow(
+                      actions: [
+                        SwipeAction(
+                          label: l10n.chatMenuMarkUnread,
+                          color: theme.colorScheme.secondaryContainer,
+                          foreground: theme.colorScheme.onSecondaryContainer,
+                          onPressed: () async {
+                            if (room.markedUnread ||
+                                room.notificationCount > 0) {
+                              await room.markUnread(false);
+                              await room.setReadMarker(room.lastEvent?.eventId);
+                            } else {
+                              await room.markUnread(true);
+                            }
+                          },
+                        ),
+                        SwipeAction(
+                          label: l10n.delete,
+                          color: theme.colorScheme.error,
+                          onPressed: () async {
+                            final result = await showOkCancelAlertDialog(
+                              context: context,
+                              title: l10n.chatDeleteConfirmTitle,
+                              message: l10n.chatDeleteConfirmBody,
+                              okLabel: l10n.delete,
+                              cancelLabel: l10n.cancel,
+                              isDestructive: true,
+                            );
+                            if (result != OkCancelResult.ok) return;
+                            await room.forget();
+                          },
+                        ),
+                      ],
+                      child: ChatListItem(
+                        room,
+                        space: space,
+                        key: Key('chat_list_item_${room.id}'),
+                        filter: filter,
+                        onTap: () => controller.onChatTap(room),
+                        onLongPress: (context) =>
+                            showChatListRoomMenu(context, room),
+                        activeChat: controller.activeChat == room.id,
+                      ),
                     );
                   },
                 ),

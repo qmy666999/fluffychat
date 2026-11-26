@@ -16,6 +16,7 @@ import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/push_helper.dart';
 import 'package:fluffychat/utils/uia_request_manager.dart';
 import 'package:fluffychat/utils/voip/matrix_voip.dart';
+import 'package:fluffychat/utils/wechat/reminder_service.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/app_update_dialog.dart';
 import 'package:fluffychat/widgets/fluffy_chat_app.dart';
@@ -210,6 +211,32 @@ class MatrixState extends State<Matrix> {
     _listener = AppLifecycleListener(onStateChange: didChangeAppLifecycleState);
     initMatrix();
     _scheduleUpdateCheck();
+    _startReminderTicker();
+  }
+
+  Timer? _reminderTimer;
+
+  /// 每分钟看一次有没有到点的消息提醒（前台才有，见 ReminderService 的说明）。
+  void _startReminderTicker() {
+    _reminderTimer?.cancel();
+    _reminderTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
+      if (!mounted) return;
+      final entry = await ReminderService.popDue(client);
+      if (entry == null || !mounted) return;
+      final l10n = L10n.of(context);
+      final preview = entry.text.trim();
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(
+            preview.isEmpty ? l10n.remindTitle : '${l10n.remindTitle}：$preview',
+          ),
+          action: SnackBarAction(
+            label: l10n.open,
+            onPressed: () => FluffyChatApp.router.go('/rooms/${entry.roomId}'),
+          ),
+        ),
+      );
+    });
   }
 
   Timer? _updateCheckTimer;
@@ -413,6 +440,7 @@ class MatrixState extends State<Matrix> {
   @override
   void dispose() {
     _updateCheckTimer?.cancel();
+    _reminderTimer?.cancel();
     _listener?.dispose();
 
     for (final sub in onRoomKeyRequestSub.values) {

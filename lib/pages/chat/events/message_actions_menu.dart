@@ -2,16 +2,22 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:math' as math;
+
 import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/favorites/favorites_service.dart';
+import 'package:fluffychat/utils/wechat/reminder_service.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
-/// 长按文字 / 语音消息时，在气泡上方弹出的微信式宫格菜单。
+/// 长按消息时在气泡上方弹出的微信式宫格菜单。
 ///
-/// 只放真的能用的项：撤回（仅自己发的）、多选、引用、收藏。
-/// 听筒播放 / 背景播放 / 转文字 / 提醒 / 连续朗读这些做不了的，一律不出现。
+/// 微信规则：
+/// * 自己的消息 2 分钟内可以撤回，超过 5 分钟只能删除；
+/// * 文字消息才有「复制」；
+/// * 提醒（三档）目前只在 App 前台弹出（见 ReminderService 注释）。
 Future<void> showMessageActionsMenu(
   BuildContext context, {
   required Event event,
@@ -24,13 +30,26 @@ Future<void> showMessageActionsMenu(
   final isFavorited = FavoritesService(
     event.room.client,
   ).contains(event.eventId);
+  final age = DateTime.now().difference(event.originServerTs);
+  final canRedact = isOwn && age.inMinutes < 5;
+  final canDelete = age.inMinutes >= 2;
+  final isText =
+      event.messageType == MessageTypes.Text ||
+      event.messageType == MessageTypes.Notice ||
+      event.messageType == MessageTypes.Emote;
 
   final actions = <_MessageAction>[
-    if (isOwn)
+    if (canRedact)
       _MessageAction(
         icon: Icons.undo_outlined,
         label: l10n.redactMessage,
         onTap: () => _confirmRedact(context, event),
+      ),
+    if (isText)
+      _MessageAction(
+        icon: Icons.copy_outlined,
+        label: l10n.copy,
+        onTap: () => _copy(context, event),
       ),
     _MessageAction(
       icon: Icons.checklist_outlined,
@@ -43,16 +62,31 @@ Future<void> showMessageActionsMenu(
       onTap: onReply,
     ),
     _MessageAction(
+      icon: Icons.alarm_add_outlined,
+      label: l10n.messageRemind,
+      onTap: () => _pickReminder(context, event),
+    ),
+    _MessageAction(
       icon: isFavorited ? Icons.bookmark : Icons.bookmark_add_outlined,
       label: isFavorited ? l10n.messageFavorited : l10n.messageFavorite,
       onTap: () => _toggleFavorite(context, event),
     ),
+    if (canDelete)
+      _MessageAction(
+        icon: Icons.delete_outline,
+        label: l10n.delete,
+        onTap: () => _confirmRedact(context, event),
+      ),
   ];
 
   const itemWidth = 72.0;
+  const itemHeight = 88.0;
   const menuPadding = 8.0;
-  const menuHeight = 88.0;
-  final menuWidth = itemWidth * actions.length + menuPadding * 2;
+  const perRow = 4;
+  final rows = math.min(actions.length, perRow);
+  final columns = (actions.length / perRow).ceil();
+  final menuWidth = itemWidth * rows + menuPadding * 2;
+  final menuHeight = itemHeight * columns;
 
   final screen = MediaQuery.sizeOf(context);
   final overlayBox =
@@ -69,7 +103,7 @@ Future<void> showMessageActionsMenu(
   var left = anchor == null
       ? (screen.width - menuWidth) / 2
       : (isOwn ? anchor.right - menuWidth - 12 : anchor.left + 56);
-  left = left.clamp(8.0, screen.width - menuWidth - 8);
+  left = left.clamp(8.0, math.max(8.0, screen.width - menuWidth - 8));
   var top = anchor == null
       ? screen.height / 2 - menuHeight / 2
       : anchor.top - menuHeight - 8;
@@ -100,18 +134,20 @@ Future<void> showMessageActionsMenu(
             color: theme.colorScheme.surface,
             child: Padding(
               padding: const EdgeInsets.all(menuPadding),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final action in actions)
-                    _MessageActionButton(
-                      action: action,
-                      onTap: () {
-                        Navigator.of(dialogContext).pop();
-                        action.onTap();
-                      },
-                    ),
-                ],
+              child: SizedBox(
+                width: menuWidth - menuPadding * 2,
+                child: Wrap(
+                  children: [
+                    for (final action in actions)
+                      _MessageActionButton(
+                        action: action,
+                        onTap: () {
+                          Navigator.of(dialogContext).pop();
+                          action.onTap();
+                        },
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -205,6 +241,42 @@ Future<void> _confirmRedact(BuildContext context, Event event) async {
   );
   if (confirmed != true) return;
   await event.redactEvent();
+}
+
+void _copy(BuildContext context, Event event) {
+  final messenger = ScaffoldMessenger.of(context);
+  final l10n = L10n.of(context);
+  Clipboard.setData(ClipboardData(text: event.body));
+  messenger.showSnackBar(SnackBar(content: Text(l10n.copiedToClipboard)));
+}
+
+Future<void> _pickReminder(BuildContext context, Event event) async {
+  final l10n = L10n.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  final now = DateTime.now();
+  final choice = await showDialog<Duration>(
+    context: context,
+    builder: (context) => SimpleDialog(
+      title: Text(l10n.remindTitle),
+      children: [
+        SimpleDialogOption(
+          onPressed: () => Navigator.of(context).pop(const Duration(hours: 1)),
+          child: Text(l10n.remindIn1Hour),
+        ),
+        SimpleDialogOption(
+          onPressed: () => Navigator.of(context).pop(const Duration(days: 1)),
+          child: Text(l10n.remindTomorrow),
+        ),
+        SimpleDialogOption(
+          onPressed: () => Navigator.of(context).pop(const Duration(days: 7)),
+          child: Text(l10n.remindIn1Week),
+        ),
+      ],
+    ),
+  );
+  if (choice == null) return;
+  await ReminderService(event.room.client).add(event, now.add(choice));
+  messenger.showSnackBar(SnackBar(content: Text(l10n.remindSet)));
 }
 
 Future<void> _toggleFavorite(BuildContext context, Event event) async {

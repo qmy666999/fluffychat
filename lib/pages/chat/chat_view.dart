@@ -17,10 +17,10 @@ import 'package:fluffychat/pages/chat/pinned_events.dart';
 import 'package:fluffychat/pages/chat/reply_display.dart';
 import 'package:fluffychat/utils/account_config.dart';
 import 'package:fluffychat/utils/matrix_live_kit_calls/matrix_live_kit_call.dart';
-import 'package:fluffychat/widgets/chat_settings_popup_menu.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:fluffychat/widgets/mxc_image.dart';
 import 'package:fluffychat/widgets/pulsating_widget.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
@@ -265,7 +265,14 @@ class ChatView extends StatelessWidget {
                         icon: Icon(Icons.call_outlined),
                         onPressed: controller.startOrJoinVideoCall,
                       ),
-                    ChatSettingsPopupMenu(controller.room, true),
+                    // 微信式：右上角「…」直接进聊天信息页，不再弹菜单。
+                    IconButton(
+                      tooltip: L10n.of(context).chatInfo,
+                      icon: const Icon(Icons.more_horiz),
+                      onPressed: () => context.push(
+                        '/rooms/info?roomId=${controller.room.id}',
+                      ),
+                    ),
                   ],
                 ],
                 bottom: PreferredSize(

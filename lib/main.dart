@@ -28,6 +28,7 @@ import 'config/server_endpoints.dart';
 import 'config/setting_keys.dart';
 import 'utils/background_push.dart';
 import 'utils/server_probe.dart';
+import 'utils/wechat/wechat_prefs.dart';
 import 'widgets/fluffy_chat_app.dart';
 
 ReceivePort? mainIsolateReceivePort;
@@ -77,6 +78,7 @@ void main(List<String> args) => runZonedGuarded(() async {
   final store = await AppSettings.init();
   // 动效设置要在任何路由构造之前读进内存（路由里取的是静态字段，不能 await）。
   MotionSettings.load(store);
+  WechatPrefs.init(store);
   Logs().i('Welcome to ${AppSettings.applicationName.value} <3');
 
   kEnableMatrixSdkBenchmarks = AppSettings.benchmarksInLogs.value;

@@ -214,10 +214,22 @@ class ChatEventList extends StatelessWidget {
                   previousEvent?.isCollapsedState == true &&
                   !controller.expandedEventIds.contains(event.eventId);
 
+              // 微信式：除了跨天，间隔超过 5 分钟也插一条时间分割线。
+              final sameDayAsNext =
+                  nextEvent != null &&
+                  event.originServerTs.sameDay(nextEvent.originServerTs);
+              final gapBigEnough =
+                  nextEvent != null &&
+                  event.originServerTs.difference(nextEvent.originServerTs) >=
+                      const Duration(minutes: 5);
               final displayDate =
                   event.type == EventTypes.RoomCreate ||
                   nextEvent == null ||
-                  !event.originServerTs.sameDay(nextEvent.originServerTs);
+                  !sameDayAsNext ||
+                  gapBigEnough;
+              final dateLabel = sameDayAsNext
+                  ? event.originServerTs.localizedTime(context)
+                  : event.originServerTs.localizedDate(context);
 
               return AutoScrollTag(
                 key: ValueKey(event.transactionId ?? event.eventId),
@@ -245,7 +257,7 @@ class ChatEventList extends StatelessWidget {
                                   vertical: 2.0,
                                 ),
                                 child: Text(
-                                  event.originServerTs.localizedDate(context),
+                                  dateLabel,
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: theme.colorScheme.onInverseSurface,

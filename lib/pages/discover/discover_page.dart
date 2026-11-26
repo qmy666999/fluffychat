@@ -6,11 +6,12 @@ import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list_bottom_bar.dart';
 import 'package:fluffychat/utils/moments/moments_service.dart';
 import 'package:fluffychat/utils/scan_flow.dart';
+import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// 发现页：只放「朋友圈」这一项。点进去是全屏朋友圈，不带底部导航。
+/// 发现页：朋友圈、扫一扫，可在设置里隐藏/排序。
 class DiscoverPage extends StatefulWidget {
   const DiscoverPage({super.key});
 
@@ -46,28 +47,33 @@ class _DiscoverPageState extends State<DiscoverPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = L10n.of(context);
+    final order = WechatPrefs.discoverOrder
+        .where((id) => !WechatPrefs.isDiscoverHidden(id))
+        .toList();
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.bottomTabDiscover),
         centerTitle: true,
         automaticallyImplyLeading: false,
-        // 发现页没有「添加联系人」入口，右上角保持干净（微信也只有扫一扫/搜索，
-        // 扫一扫见待做项）。
+        // 发现页没有「添加联系人」入口，右上角保持干净。
       ),
       bottomNavigationBar: const ChatListBottomBar(currentIndex: 2),
       body: ListView(
         children: [
-          _DiscoverRow(
-            icon: Icons.photo_camera_outlined,
-            label: l10n.moments,
-            showDot: _hasNew,
-            onTap: _openMoments,
-          ),
-          _DiscoverRow(
-            icon: Icons.qr_code_scanner,
-            label: l10n.scan,
-            onTap: () => startMatrixScan(context),
-          ),
+          for (final id in order)
+            if (id == 'moments')
+              _DiscoverRow(
+                icon: Icons.photo_camera_outlined,
+                label: l10n.moments,
+                showDot: _hasNew,
+                onTap: _openMoments,
+              )
+            else if (id == 'scan')
+              _DiscoverRow(
+                icon: Icons.qr_code_scanner,
+                label: l10n.scan,
+                onTap: () => startMatrixScan(context),
+              ),
         ],
       ),
     );

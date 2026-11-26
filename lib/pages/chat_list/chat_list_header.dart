@@ -7,6 +7,7 @@ import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list.dart';
 import 'package:fluffychat/utils/moments/moments_service.dart';
+import 'package:fluffychat/utils/scan_flow.dart';
 import 'package:fluffychat/utils/sync_status_localization.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -150,15 +151,24 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
             onPressed: controller.cancelSearch,
           )
         else ...[
-          // 微信右上角「+」：发起群聊 / 添加朋友
+          // 微信右上角「+」：发起群聊 / 添加朋友 / 扫一扫 / 收付款
           PopupMenuButton<String>(
             tooltip: L10n.of(context).createGroup,
             icon: const Icon(Icons.add),
             onSelected: (value) {
-              if (value == 'group') {
-                context.go('/rooms/newgroup');
-              } else if (value == 'friend') {
-                context.push('/contacts/add');
+              switch (value) {
+                case 'group':
+                  context.go('/rooms/newgroup');
+                case 'friend':
+                  context.push('/contacts/add');
+                case 'scan':
+                  startMatrixScan(context);
+                case 'pay':
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(L10n.of(context).receiveMoneyUnavailable),
+                    ),
+                  );
               }
             },
             itemBuilder: (context) => [
@@ -169,6 +179,11 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
               PopupMenuItem(
                 value: 'friend',
                 child: Text(L10n.of(context).addFriend),
+              ),
+              PopupMenuItem(value: 'scan', child: Text(L10n.of(context).scan)),
+              PopupMenuItem(
+                value: 'pay',
+                child: Text(L10n.of(context).receiveMoney),
               ),
             ],
           ),
