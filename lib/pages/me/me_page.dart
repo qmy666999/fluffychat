@@ -4,6 +4,7 @@
 
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list_bottom_bar.dart';
+import 'package:fluffychat/pages/me/account_switcher.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
@@ -14,9 +15,42 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 /// 「我」tab：头像、昵称、ID、二维码，以及常用入口。
 ///
 /// 以前点「我」弹的是账号切换抽屉，现在是一页正常的个人中心，
-/// 抽屉里的设置等入口都收到这里。
-class MePage extends StatelessWidget {
+/// 抽屉里的设置等入口都收到这里。点账号卡片（头像/名字）弹账号切换面板，
+/// 右边的二维码图标单独负责二维码。
+class MePage extends StatefulWidget {
   const MePage({super.key});
+
+  @override
+  State<MePage> createState() => _MePageState();
+}
+
+class _MePageState extends State<MePage> {
+  Client? _profileClient;
+  Future<Profile?>? _profileFuture;
+
+  /// 切换账号后要重新取资料，所以按 client 实例缓存自己的 future。
+  Future<Profile?> _profileOf(Client client) {
+    if (!identical(_profileClient, client)) {
+      _profileClient = client;
+      _profileFuture = client.isLogged()
+          ? client.fetchOwnProfile()
+          : Future.value(null);
+    }
+    return _profileFuture!;
+  }
+
+  Future<void> _openAccountSwitcher() async {
+    final result = await showAccountSwitcher(context);
+    if (!mounted || result == null) return;
+    if (result == AccountSwitcherResult.addAccount) {
+      await context.push('/rooms/settings/addaccount');
+      if (!mounted) return;
+      setState(() {});
+      return;
+    }
+    // 切了账号：整页按新 client 重新取资料。
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,48 +68,84 @@ class MePage extends StatelessWidget {
       bottomNavigationBar: const ChatListBottomBar(currentIndex: 3),
       body: ListView(
         children: [
-          FutureBuilder<Profile>(
-            future: client.isLogged() ? client.fetchOwnProfile() : null,
+          FutureBuilder<Profile?>(
+            future: _profileOf(client),
             builder: (context, snapshot) {
               final profile = snapshot.data;
               final name =
                   profile?.displayName ??
                   userId.localpart ??
                   l10n.unknownDevice;
-              return InkWell(
-                onTap: () => _showQr(context, userId, name),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-                  child: Row(
-                    children: [
-                      Avatar(
-                        mxContent: profile?.avatarUrl,
-                        name: name,
-                        size: 64,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(name, style: theme.textTheme.titleLarge),
-                            const SizedBox(height: 4),
-                            Text(
-                              userId,
-                              style: TextStyle(
-                                color: theme.colorScheme.onSurfaceVariant,
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: _openAccountSwitcher,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Row(
+                            children: [
+                              Avatar(
+                                mxContent: profile?.avatarUrl,
+                                name: name,
+                                size: 64,
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: theme.textTheme.titleLarge,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Icon(
+                                          Icons.unfold_more,
+                                          size: 18,
+                                          color: theme
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      userId,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      Icon(
+                    ),
+                    IconButton(
+                      tooltip: l10n.qrCode,
+                      onPressed: () => _showQr(context, userId, name),
+                      icon: Icon(
                         Icons.qr_code_2_outlined,
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               );
             },

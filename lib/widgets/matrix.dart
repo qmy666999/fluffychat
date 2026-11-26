@@ -316,7 +316,17 @@ class MatrixState extends State<Matrix> {
 
           _cancelSubs(c.clientName);
           unawaited(MatrixVoip.of(c)?.dispose());
+          // 退登的可能是「当前账号以外的」账号：把 clients 里的一项删掉会让
+          // 后面的下标整体前移，先修正 _activeClient，否则会悄悄切到别的账号。
+          final removedIndex = widget.clients.indexOf(c);
           widget.clients.remove(c);
+          if (removedIndex != -1) {
+            if (removedIndex == _activeClient) {
+              _activeClient = -1;
+            } else if (removedIndex < _activeClient) {
+              _activeClient--;
+            }
+          }
           ClientManager.removeClientNameFromStore(c.clientName, store);
           InitWithRestoreExtension.deleteSessionBackup(name);
 

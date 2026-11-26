@@ -3219,5 +3219,7 @@
   "cleanLeftRoomsConfirm": "将清理 {count} 个已退出会话的本地缓存，聊天记录在服务器上仍然保留。",
   "@cleanLeftRoomsConfirm": {"placeholders": {"count": {"type": "String"}}},
   "cleanLeftRoomsDone": "已清理 {count} 个会话",
-  "@cleanLeftRoomsDone": {"placeholders": {"count": {"type": "String"}}}
+  "@cleanLeftRoomsDone": {"placeholders": {"count": {"type": "String"}}},
+  "switchAccount": "切换账号",
+  "logoutThisAccount": "退出这个账号"
 }
