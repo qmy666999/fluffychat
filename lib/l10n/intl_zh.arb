@@ -3003,10 +3003,10 @@
             }
         }
     },
-  "audioFavorite": "收藏",
-  "audioFavorited": "已收藏",
-  "audioFavoriteRemoved": "已取消收藏",
-  "audioQuote": "引用",
-  "audioMultiSelect": "多选",
+  "messageFavorite": "收藏",
+  "messageFavorited": "已收藏",
+  "messageFavoriteRemoved": "已取消收藏",
+  "messageQuote": "引用",
+  "messageMultiSelect": "多选",
   "redactConfirm": "撤回这条消息？"
 }

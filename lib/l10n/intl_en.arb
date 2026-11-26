@@ -3003,10 +3003,10 @@
             }
         }
     },
-  "audioFavorite": "Favorite",
-  "audioFavorited": "Saved",
-  "audioFavoriteRemoved": "Removed from favorites",
-  "audioQuote": "Quote",
-  "audioMultiSelect": "Select",
+  "messageFavorite": "Favorite",
+  "messageFavorited": "Saved",
+  "messageFavoriteRemoved": "Removed from favorites",
+  "messageQuote": "Quote",
+  "messageMultiSelect": "Select",
   "redactConfirm": "Unsend this message?"
 }

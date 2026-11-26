@@ -8,11 +8,11 @@ import 'package:fluffychat/utils/favorites/favorites_service.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
-/// 长按语音消息弹出的微信式宫格菜单。
+/// 长按文字 / 语音消息时，在气泡上方弹出的微信式宫格菜单。
 ///
 /// 只放真的能用的项：撤回（仅自己发的）、多选、引用、收藏。
 /// 听筒播放 / 背景播放 / 转文字 / 提醒 / 连续朗读这些做不了的，一律不出现。
-Future<void> showAudioActionsMenu(
+Future<void> showMessageActionsMenu(
   BuildContext context, {
   required Event event,
   required void Function(Event) onSelect,
@@ -25,26 +25,26 @@ Future<void> showAudioActionsMenu(
     event.room.client,
   ).contains(event.eventId);
 
-  final actions = <_AudioAction>[
+  final actions = <_MessageAction>[
     if (isOwn)
-      _AudioAction(
+      _MessageAction(
         icon: Icons.undo_outlined,
         label: l10n.redactMessage,
         onTap: () => _confirmRedact(context, event),
       ),
-    _AudioAction(
+    _MessageAction(
       icon: Icons.checklist_outlined,
-      label: l10n.audioMultiSelect,
+      label: l10n.messageMultiSelect,
       onTap: () => onSelect(event),
     ),
-    _AudioAction(
+    _MessageAction(
       icon: Icons.format_quote_outlined,
-      label: l10n.audioQuote,
+      label: l10n.messageQuote,
       onTap: onReply,
     ),
-    _AudioAction(
+    _MessageAction(
       icon: isFavorited ? Icons.bookmark : Icons.bookmark_add_outlined,
-      label: isFavorited ? l10n.audioFavorited : l10n.audioFavorite,
+      label: isFavorited ? l10n.messageFavorited : l10n.messageFavorite,
       onTap: () => _toggleFavorite(context, event),
     ),
   ];
@@ -104,7 +104,7 @@ Future<void> showAudioActionsMenu(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   for (final action in actions)
-                    _AudioActionButton(
+                    _MessageActionButton(
                       action: action,
                       onTap: () {
                         Navigator.of(dialogContext).pop();
@@ -123,23 +123,23 @@ Future<void> showAudioActionsMenu(
   );
 }
 
-class _AudioAction {
+class _MessageAction {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
 
-  const _AudioAction({
+  const _MessageAction({
     required this.icon,
     required this.label,
     required this.onTap,
   });
 }
 
-class _AudioActionButton extends StatelessWidget {
-  final _AudioAction action;
+class _MessageActionButton extends StatelessWidget {
+  final _MessageAction action;
   final VoidCallback onTap;
 
-  const _AudioActionButton({required this.action, required this.onTap});
+  const _MessageActionButton({required this.action, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -213,7 +213,9 @@ Future<void> _toggleFavorite(BuildContext context, Event event) async {
   final added = await FavoritesService(event.room.client).toggle(event);
   messenger.showSnackBar(
     SnackBar(
-      content: Text(added ? l10n.audioFavorited : l10n.audioFavoriteRemoved),
+      content: Text(
+        added ? l10n.messageFavorited : l10n.messageFavoriteRemoved,
+      ),
     ),
   );
 }

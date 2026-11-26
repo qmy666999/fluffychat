@@ -24,7 +24,7 @@ import 'package:matrix/matrix.dart';
 
 import '../../../config/app_config.dart';
 import '../sticker_picker_dialog.dart';
-import 'audio_actions_menu.dart';
+import 'message_actions_menu.dart';
 import 'message_content.dart';
 import 'message_reactions.dart';
 import 'reply_content.dart';
@@ -427,10 +427,8 @@ class Message extends StatelessWidget {
                                     ? null
                                     : () {
                                         HapticFeedback.heavyImpact();
-                                        if (event.type == EventTypes.Message &&
-                                            event.messageType ==
-                                                MessageTypes.Audio) {
-                                          showAudioActionsMenu(
+                                        if (_showsActionsMenu(event)) {
+                                          showMessageActionsMenu(
                                             context,
                                             event: event,
                                             onSelect: onSelect,
@@ -967,6 +965,22 @@ class BubbleBackground extends StatelessWidget {
       ),
       child: child,
     );
+  }
+}
+
+/// 长按会弹出宫格菜单的消息类型：文字类（含表情、通知）与语音。
+///
+/// 图片、视频、文件等仍然走原来的多选（那里有「保存到手机」等动作）。
+bool _showsActionsMenu(Event event) {
+  if (event.type != EventTypes.Message) return false;
+  switch (event.messageType) {
+    case MessageTypes.Text:
+    case MessageTypes.Notice:
+    case MessageTypes.Emote:
+    case MessageTypes.Audio:
+      return true;
+    default:
+      return false;
   }
 }
 
