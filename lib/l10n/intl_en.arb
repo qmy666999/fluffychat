@@ -3200,5 +3200,11 @@
   "notifyCall": "Call invitation alerts",
   "privacyPolicy": "Privacy policy",
   "featureComingSoon": "Coming in a later version",
-  "qrCode": "QR code"
+  "qrCode": "QR code",
+  "keepAliveNotification": "Receiving messages",
+  "keepAliveNotificationDescription": "Keeping the connection alive to receive new messages",
+  "keepAliveTitle": "Background notification",
+  "keepAliveHint": "Android requires a persistent notification while the app receives messages in the background. It uses the lowest importance: no status bar icon, no sound, no vibration and no heads-up banner. You can only find it in the silent section of your notification shade.",
+  "openSystemNotificationSettings": "Open system notification settings",
+  "openNotificationSettingsFailed": "Could not open the system settings, please open Settings → Apps → Notifications manually"
 }

@@ -187,6 +187,9 @@ class AppStarter with WidgetsBindingObserver {
       client.backgroundSync = true;
       client.syncPresence = PresenceType.online;
     }
+    // 用户回到 App 就不再需要常驻通知撑着后台连接了，立刻收掉，
+    // 免得状态栏（或通知中心的静默区）一直挂着「正在接收消息」。
+    ForegroundServices.stopService('background_push');
     startGui(clients, store);
     // We must make sure that the GUI is only started once.
     guiStarted = true;

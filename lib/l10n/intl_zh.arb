@@ -3200,5 +3200,11 @@
   "notifyCall": "语音和视频通话邀请提醒",
   "privacyPolicy": "隐私政策",
   "featureComingSoon": "该功能将在后续版本提供",
-  "qrCode": "二维码"
+  "qrCode": "二维码",
+  "keepAliveNotification": "正在接收消息",
+  "keepAliveNotificationDescription": "保持后台连接以便及时收到新消息",
+  "keepAliveTitle": "常驻通知",
+  "keepAliveHint": "为了在你退出应用后仍能收到消息，安卓系统要求显示一条常驻通知。它已设为最低优先级：状态栏不显示图标、不响不震、不弹横幅，只在通知中心的「其他通知」里可以找到。",
+  "openSystemNotificationSettings": "打开系统通知设置",
+  "openNotificationSettingsFailed": "打不开系统设置，请手动前往「设置 → 应用 → 通知」"
 }

@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/utils/app_settings_launcher.dart';
 import 'package:fluffychat/utils/updates/app_update_service.dart';
 import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
 import 'package:fluffychat/widgets/avatar.dart';
@@ -32,12 +34,77 @@ class SettingsNotificationsPage extends StatefulWidget {
 }
 
 class _SettingsNotificationsPageState extends State<SettingsNotificationsPage> {
+  bool _openingSettings = false;
+
+  Future<void> _openSystemNotificationSettings() async {
+    if (_openingSettings) return;
+    setState(() => _openingSettings = true);
+    final opened = await openAppNotificationSettings();
+    if (!mounted) return;
+    setState(() => _openingSettings = false);
+    if (!opened) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(L10n.of(context).openNotificationSettingsFailed),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = L10n.of(context);
+    final theme = Theme.of(context);
     return _WechatSettingsScaffold(
       title: l10n.settingsNewMessage,
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(AppConfig.borderRadius),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.notifications_off_outlined,
+                      size: 20,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      l10n.keepAliveTitle,
+                      style: theme.textTheme.titleSmall,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.keepAliveHint,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _openingSettings
+                        ? null
+                        : _openSystemNotificationSettings,
+                    child: Text(l10n.openSystemNotificationSettings),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
         SwitchListTile.adaptive(
           title: Text(l10n.notifyReceive),
           value: WechatPrefs.notifyReceive,
