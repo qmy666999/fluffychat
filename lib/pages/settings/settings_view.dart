@@ -19,6 +19,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 import '../../widgets/mxc_image_viewer.dart';
 import 'server_endpoint_tile.dart';
 import 'settings.dart';
+import 'update_check_tile.dart';
 
 class SettingsView extends StatelessWidget {
   final SettingsController controller;
@@ -260,6 +261,7 @@ class SettingsView extends StatelessWidget {
             ),
             // 当前走的是局域网还是公网，附带「重新检测」。
             const ServerEndpointTile(),
+            const UpdateCheckTile(),
             Divider(color: theme.dividerColor),
             ListTile(
               leading: const Icon(Icons.logout_outlined),

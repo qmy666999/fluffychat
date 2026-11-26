@@ -2300,7 +2300,7 @@
         }
     },
     "changelog": "Changelog",
-    "updateAvailable": "Update {version} available",
+    "updateAvailable": "Version {version} available",
     "@updateAvailable": {
         "type": "String",
         "placeholders": {
@@ -3091,5 +3091,31 @@
   "@callInviteVideo": {
     "placeholders": {"name": {"type": "String"}}
   },
-  "callVideoSwitchUnavailable": "Switching to video mid-call is not supported yet, please hang up and start a video call"
+  "callVideoSwitchUnavailable": "Switching to video mid-call is not supported yet, please hang up and start a video call",
+  "updateCheck": "Check for updates",
+  "updateLatest": "You are up to date",
+  "updateNow": "Update now",
+  "updateLater": "Later",
+  "updateDownloading": "Downloading… {percent}%",
+  "@updateDownloading": {
+    "placeholders": {"percent": {"type": "String"}}
+  },
+  "updateVerifying": "Verifying the package…",
+  "updateInstallFailed": "Could not open the installer. Allow \"install unknown apps\" for this app in the system settings and try again",
+  "updateChecksumFailed": "Package verification failed, please try again",
+  "updateFailed": "Update failed: {error}",
+  "@updateFailed": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "updateCurrentVersion": "Current version",
+  "updateNewVersion": "New version",
+  "updateSize": "Size",
+  "updateCheckFailed": "Could not check for updates, please try again later",
+  "updateServerRejected": "The update is hosted on another server, download refused",
+  "updateForceHint": "This update is required to keep using the app",
+  "keyboardMode": "Keyboard",
+  "holdToSpeak": "Hold to talk",
+  "releaseToSend": "Release to send",
+  "releaseToCancel": "Release to cancel",
+  "voiceRecordingTooShort": "That was too short"
 }

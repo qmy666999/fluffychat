@@ -17,6 +17,7 @@ import 'package:fluffychat/utils/push_helper.dart';
 import 'package:fluffychat/utils/uia_request_manager.dart';
 import 'package:fluffychat/utils/voip/matrix_voip.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
+import 'package:fluffychat/widgets/app_update_dialog.dart';
 import 'package:fluffychat/widgets/fluffy_chat_app.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
 import 'package:flutter/foundation.dart';
@@ -208,6 +209,18 @@ class MatrixState extends State<Matrix> {
     super.initState();
     _listener = AppLifecycleListener(onStateChange: didChangeAppLifecycleState);
     initMatrix();
+    _scheduleUpdateCheck();
+  }
+
+  Timer? _updateCheckTimer;
+
+  /// 启动 5 秒后悄悄检查一次更新，一天最多提示一次。
+  void _scheduleUpdateCheck() {
+    _updateCheckTimer?.cancel();
+    _updateCheckTimer = Timer(const Duration(seconds: 5), () {
+      if (!mounted) return;
+      checkAndPromptUpdate(context, automatic: true);
+    });
   }
 
   AppLifecycleListener? _listener;
@@ -399,6 +412,7 @@ class MatrixState extends State<Matrix> {
 
   @override
   void dispose() {
+    _updateCheckTimer?.cancel();
     _listener?.dispose();
 
     for (final sub in onRoomKeyRequestSub.values) {

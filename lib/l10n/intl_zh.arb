@@ -2827,7 +2827,7 @@
             }
         }
     },
-    "updateAvailable": "有 {version} 版更新可用",
+    "updateAvailable": "发现新版本 {version}",
     "@updateAvailable": {
         "type": "String",
         "placeholders": {
@@ -3091,5 +3091,31 @@
   "@callInviteVideo": {
     "placeholders": {"name": {"type": "String"}}
   },
-  "callVideoSwitchUnavailable": "暂不支持中途切换视频，请挂断后改用视频通话"
+  "callVideoSwitchUnavailable": "暂不支持中途切换视频，请挂断后改用视频通话",
+  "updateCheck": "检查更新",
+  "updateLatest": "已是最新版本",
+  "updateNow": "立即更新",
+  "updateLater": "稍后",
+  "updateDownloading": "正在下载… {percent}%",
+  "@updateDownloading": {
+    "placeholders": {"percent": {"type": "String"}}
+  },
+  "updateVerifying": "正在校验安装包…",
+  "updateInstallFailed": "无法调起安装器，请到系统设置里允许本应用「安装未知应用」后重试",
+  "updateChecksumFailed": "安装包校验失败，请重试",
+  "updateFailed": "更新失败：{error}",
+  "@updateFailed": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "updateCurrentVersion": "当前版本",
+  "updateNewVersion": "新版本",
+  "updateSize": "大小",
+  "updateCheckFailed": "检查更新失败，请稍后再试",
+  "updateServerRejected": "更新包地址不是本服务器，已拒绝下载",
+  "updateForceHint": "这个版本必须更新后才能继续使用",
+  "keyboardMode": "键盘",
+  "holdToSpeak": "按住 说话",
+  "releaseToSend": "松开 发送",
+  "releaseToCancel": "松开 取消",
+  "voiceRecordingTooShort": "说话时间太短"
 }
