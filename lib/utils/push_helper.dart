@@ -111,6 +111,47 @@ Future<void> pushHelper(
   }
 }
 
+/// 本地要不要为这条事件弹通知。
+///
+/// 以前这里直接写 `client.pushruleEvaluator.match(event).notify`，有两个坑：
+/// 1. SDK 在没有拿到 `m.push_rules` 账号数据时 `pushruleEvaluator` 是一个
+///    空规则集，任何事件都匹配不到规则，默认返回 `notify = false`
+///    —— 结果全世界所有消息都被当成「免打扰」丢掉；
+/// 2. 普通消息的规则 actions 里是 `set_tweak: highlight, value: false`，
+///    highlight 只影响要不要横幅，不参与「要不要通知」。
+///
+/// 现在的规则：只有「用户明确静音」才拦，其余一律放行。
+/// - `.m.rule.master` 打开（全局静音）→ 不弹；
+/// - 房间级免打扰（`room.pushRuleState == dontNotify`）→ 不弹；
+/// - 只收 @ 提及（`mentionsOnly`）时，没被提及 → 不弹；
+/// - 其余情况（包括没拿到规则集）→ 弹。
+bool _shouldNotifyLocally(Client client, Event event) {
+  final room = event.room;
+  final state = room.pushRuleState;
+  final matched = client.pushruleEvaluator.match(event);
+  final master = client.allPushNotificationsMuted;
+  NotificationLog.add(
+    'pushHelper 规则检查 room=${room.id} rules=${client.globalPushRules != null} '
+    'master=$master roomState=${state.name} '
+    'notify=${matched.notify} highlight=${matched.highlight}',
+  );
+
+  if (master) {
+    NotificationLog.add('跳过：全局静音（.m.rule.master 开启）');
+    return false;
+  }
+  if (state == PushRuleState.dontNotify) {
+    NotificationLog.add('跳过：这个聊天被设为「消息免打扰」');
+    return false;
+  }
+  if (state == PushRuleState.mentionsOnly && !matched.highlight) {
+    NotificationLog.add('跳过：这个聊天只提醒 @ 我，本条没提及');
+    return false;
+  }
+  // 普通消息、规则集缺失、规则匹配不到 —— 全部放行。
+  return true;
+}
+
 Future<void> _tryPushHelper(
   PushNotification notification, {
   List<Client>? clients,
@@ -178,13 +219,7 @@ Future<void> _tryPushHelper(
 
   Logs().v('Push helper got notification event of type ${event.type}.');
 
-  if (!client.pushruleEvaluator.match(event).notify) {
-    NotificationLog.add(
-      'pushHelper: 被推送规则过滤（免打扰/静音）'
-      ' room=${event.roomId} event=${event.eventId}',
-    );
-    return;
-  }
+  if (!_shouldNotifyLocally(client, event)) return;
 
   if (event.type == RtcNotificationContent.eventType &&
       event.tryParseRtcNotificationContent()?.notificationType == .ring &&
