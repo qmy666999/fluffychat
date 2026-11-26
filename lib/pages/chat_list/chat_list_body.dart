@@ -78,176 +78,183 @@ class ChatListViewBody extends StatelessWidget {
             )
             .toList();
 
-        return CustomScrollView(
-          controller: controller.scrollController,
-          slivers: [
-            ChatListHeader(controller: controller),
-            SliverList(
-              delegate: SliverChildListDelegate([
-                if (controller.isSearchMode) ...[
-                  SearchTitle(
-                    title: L10n.of(context).publicRooms,
-                    icon: const Icon(Icons.explore_outlined),
-                  ),
-                  PublicRoomsHorizontalList(publicRooms: publicRooms),
-                  SearchTitle(
-                    title: L10n.of(context).publicSpaces,
-                    icon: const Icon(Icons.workspaces_outlined),
-                  ),
-                  PublicRoomsHorizontalList(publicRooms: publicSpaces),
-                  SearchTitle(
-                    title: L10n.of(context).users,
-                    icon: const Icon(Icons.group_outlined),
-                  ),
-                  AnimatedContainer(
-                    clipBehavior: Clip.hardEdge,
-                    decoration: const BoxDecoration(),
-                    height:
-                        userSearchResult == null ||
-                            userSearchResult.results.isEmpty
-                        ? 0
-                        : 106,
-                    duration: FluffyThemes.animationDuration,
-                    curve: FluffyThemes.animationCurve,
-                    child: userSearchResult == null
-                        ? null
-                        : ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: userSearchResult.results.length,
-                            itemBuilder: (context, i) => _SearchItem(
-                              title:
-                                  userSearchResult.results[i].displayName ??
-                                  userSearchResult
-                                      .results[i]
-                                      .userId
-                                      .localpart ??
-                                  L10n.of(context).unknownDevice,
-                              avatar: userSearchResult.results[i].avatarUrl,
-                              onPressed: () => UserDialog.show(
-                                context: context,
-                                profile: userSearchResult.results[i],
+        return RefreshIndicator(
+          onRefresh: controller.refreshChatList,
+          child: CustomScrollView(
+            controller: controller.scrollController,
+            // 不满一屏也要能下拉，否则列表里只有一两个会话时刷新手势不生效。
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              ChatListHeader(controller: controller),
+              SliverList(
+                delegate: SliverChildListDelegate([
+                  if (controller.isSearchMode) ...[
+                    SearchTitle(
+                      title: L10n.of(context).publicRooms,
+                      icon: const Icon(Icons.explore_outlined),
+                    ),
+                    PublicRoomsHorizontalList(publicRooms: publicRooms),
+                    SearchTitle(
+                      title: L10n.of(context).publicSpaces,
+                      icon: const Icon(Icons.workspaces_outlined),
+                    ),
+                    PublicRoomsHorizontalList(publicRooms: publicSpaces),
+                    SearchTitle(
+                      title: L10n.of(context).users,
+                      icon: const Icon(Icons.group_outlined),
+                    ),
+                    AnimatedContainer(
+                      clipBehavior: Clip.hardEdge,
+                      decoration: const BoxDecoration(),
+                      height:
+                          userSearchResult == null ||
+                              userSearchResult.results.isEmpty
+                          ? 0
+                          : 106,
+                      duration: FluffyThemes.animationDuration,
+                      curve: FluffyThemes.animationCurve,
+                      child: userSearchResult == null
+                          ? null
+                          : ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: userSearchResult.results.length,
+                              itemBuilder: (context, i) => _SearchItem(
+                                title:
+                                    userSearchResult.results[i].displayName ??
+                                    userSearchResult
+                                        .results[i]
+                                        .userId
+                                        .localpart ??
+                                    L10n.of(context).unknownDevice,
+                                avatar: userSearchResult.results[i].avatarUrl,
+                                onPressed: () => UserDialog.show(
+                                  context: context,
+                                  profile: userSearchResult.results[i],
+                                ),
                               ),
                             ),
-                          ),
-                  ),
-                ],
-                if (controller.isSearchMode)
-                  SearchTitle(
-                    title: L10n.of(context).chats,
-                    icon: const Icon(Icons.forum_outlined),
-                  ),
-                if (client.prevBatch != null &&
-                    rooms.isEmpty &&
-                    !controller.isSearchMode) ...[
-                  Column(
-                    mainAxisAlignment: .center,
-                    children: [
-                      Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          const Column(
-                            mainAxisSize: .min,
-                            children: [
-                              DummyChatListItem(opacity: 0.5, animate: false),
-                              DummyChatListItem(opacity: 0.3, animate: false),
-                            ],
-                          ),
-                          Icon(
-                            CupertinoIcons.chat_bubble_text_fill,
-                            size: 128,
-                            color: theme.colorScheme.secondary,
-                          ),
-                        ],
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Text(
-                          client.rooms.isEmpty
-                              ? L10n.of(context).noChatsFoundHere
-                              : L10n.of(context).noMoreChatsFound,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: theme.colorScheme.secondary,
-                          ),
+                    ),
+                  ],
+                  if (controller.isSearchMode)
+                    SearchTitle(
+                      title: L10n.of(context).chats,
+                      icon: const Icon(Icons.forum_outlined),
+                    ),
+                  if (client.prevBatch != null &&
+                      rooms.isEmpty &&
+                      !controller.isSearchMode) ...[
+                    Column(
+                      mainAxisAlignment: .center,
+                      children: [
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            const Column(
+                              mainAxisSize: .min,
+                              children: [
+                                DummyChatListItem(opacity: 0.5, animate: false),
+                                DummyChatListItem(opacity: 0.3, animate: false),
+                              ],
+                            ),
+                            Icon(
+                              CupertinoIcons.chat_bubble_text_fill,
+                              size: 128,
+                              color: theme.colorScheme.secondary,
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ]),
-            ),
-            if (client.prevBatch == null)
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) => DummyChatListItem(
-                    opacity: (dummyChatCount - i) / dummyChatCount,
-                    animate: true,
-                  ),
-                  childCount: dummyChatCount,
-                ),
-              ),
-            if (client.prevBatch != null)
-              SliverSafeArea(
-                top: false,
-                sliver: SliverList.builder(
-                  itemCount: rooms.length,
-                  itemBuilder: (BuildContext context, int i) {
-                    final room = rooms[i];
-                    final space = spaceDelegateCandidates[room.id];
-                    final theme = Theme.of(context);
-                    final l10n = L10n.of(context);
-                    return SwipeActionRow(
-                      // 用房间 ID 当 key：列表滚动/重排时 Slidable 的展开状态
-                      // 不会串到别的会话上。
-                      itemKey: room.id,
-                      actions: [
-                        SwipeAction(
-                          label: l10n.chatMenuMarkUnread,
-                          color: theme.colorScheme.secondaryContainer,
-                          foreground: theme.colorScheme.onSecondaryContainer,
-                          onPressed: () async {
-                            if (room.markedUnread ||
-                                room.notificationCount > 0) {
-                              await room.markUnread(false);
-                              await room.setReadMarker(room.lastEvent?.eventId);
-                            } else {
-                              await room.markUnread(true);
-                            }
-                          },
-                        ),
-                        SwipeAction(
-                          label: l10n.delete,
-                          color: theme.colorScheme.error,
-                          onPressed: () async {
-                            final result = await showOkCancelAlertDialog(
-                              context: context,
-                              title: l10n.chatDeleteConfirmTitle,
-                              message: l10n.chatDeleteConfirmBody,
-                              okLabel: l10n.delete,
-                              cancelLabel: l10n.cancel,
-                              isDestructive: true,
-                            );
-                            if (result != OkCancelResult.ok) return;
-                            await room.forget();
-                          },
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(
+                            client.rooms.isEmpty
+                                ? L10n.of(context).noChatsFoundHere
+                                : L10n.of(context).noMoreChatsFound,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: theme.colorScheme.secondary,
+                            ),
+                          ),
                         ),
                       ],
-                      child: ChatListItem(
-                        room,
-                        space: space,
-                        key: Key('chat_list_item_${room.id}'),
-                        filter: filter,
-                        onTap: () => controller.onChatTap(room),
-                        onLongPress: (context) =>
-                            showChatListRoomMenu(context, room),
-                        activeChat: controller.activeChat == room.id,
-                      ),
-                    );
-                  },
-                ),
+                    ),
+                  ],
+                ]),
               ),
-          ],
+              if (client.prevBatch == null)
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => DummyChatListItem(
+                      opacity: (dummyChatCount - i) / dummyChatCount,
+                      animate: true,
+                    ),
+                    childCount: dummyChatCount,
+                  ),
+                ),
+              if (client.prevBatch != null)
+                SliverSafeArea(
+                  top: false,
+                  sliver: SliverList.builder(
+                    itemCount: rooms.length,
+                    itemBuilder: (BuildContext context, int i) {
+                      final room = rooms[i];
+                      final space = spaceDelegateCandidates[room.id];
+                      final theme = Theme.of(context);
+                      final l10n = L10n.of(context);
+                      return SwipeActionRow(
+                        // 用房间 ID 当 key：列表滚动/重排时 Slidable 的展开状态
+                        // 不会串到别的会话上。
+                        itemKey: room.id,
+                        actions: [
+                          SwipeAction(
+                            label: l10n.chatMenuMarkUnread,
+                            color: theme.colorScheme.secondaryContainer,
+                            foreground: theme.colorScheme.onSecondaryContainer,
+                            onPressed: () async {
+                              if (room.markedUnread ||
+                                  room.notificationCount > 0) {
+                                await room.markUnread(false);
+                                await room.setReadMarker(
+                                  room.lastEvent?.eventId,
+                                );
+                              } else {
+                                await room.markUnread(true);
+                              }
+                            },
+                          ),
+                          SwipeAction(
+                            label: l10n.delete,
+                            color: theme.colorScheme.error,
+                            onPressed: () async {
+                              final result = await showOkCancelAlertDialog(
+                                context: context,
+                                title: l10n.chatDeleteConfirmTitle,
+                                message: l10n.chatDeleteConfirmBody,
+                                okLabel: l10n.delete,
+                                cancelLabel: l10n.cancel,
+                                isDestructive: true,
+                              );
+                              if (result != OkCancelResult.ok) return;
+                              await room.forget();
+                            },
+                          ),
+                        ],
+                        child: ChatListItem(
+                          room,
+                          space: space,
+                          key: Key('chat_list_item_${room.id}'),
+                          filter: filter,
+                          onTap: () => controller.onChatTap(room),
+                          onLongPress: (context) =>
+                              showChatListRoomMenu(context, room),
+                          activeChat: controller.activeChat == room.id,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
         );
       },
     );

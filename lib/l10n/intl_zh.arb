@@ -3206,5 +3206,18 @@
   "keepAliveTitle": "常驻通知",
   "keepAliveHint": "为了在你退出应用后仍能收到消息，安卓系统要求显示一条常驻通知。它已设为最低优先级：状态栏不显示图标、不响不震、不弹横幅，只在通知中心的「其他通知」里可以找到。",
   "openSystemNotificationSettings": "打开系统通知设置",
-  "openNotificationSettingsFailed": "打不开系统设置，请手动前往「设置 → 应用 → 通知」"
+  "openNotificationSettingsFailed": "打不开系统设置，请手动前往「设置 → 应用 → 通知」",
+  "messagesChannelName": "消息通知",
+  "messagesChannelDescription": "收到新消息时的提醒",
+  "callsChannelName": "语音和视频通话",
+  "callsChannelDescription": "来电和通话邀请",
+  "refreshFailed": "刷新失败，请检查网络",
+  "joinedChats": "已加入的聊天",
+  "leftChats": "已退出的聊天",
+  "cleanLeftRooms": "清理已退出房间",
+  "cleanLeftRoomsHint": "只清理本地缓存，服务器上的记录不受影响",
+  "cleanLeftRoomsConfirm": "将清理 {count} 个已退出会话的本地缓存，聊天记录在服务器上仍然保留。",
+  "@cleanLeftRoomsConfirm": {"placeholders": {"count": {"type": "String"}}},
+  "cleanLeftRoomsDone": "已清理 {count} 个会话",
+  "@cleanLeftRoomsDone": {"placeholders": {"count": {"type": "String"}}}
 }

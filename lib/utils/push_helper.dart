@@ -41,6 +41,9 @@ Future<void> pushHelper(
   L10n? l10n,
   String? activeRoomId,
   required FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin,
+  // 后台推送模式下，处理完一条推送就把前台服务收掉（省电）。但 App 自己在前台
+  // 服务里跑 sync 并弹本地通知时不能收，否则常驻通知会跟着消失。
+  bool stopForegroundService = true,
 }) async {
   l10n ??= await lookupL10n(PlatformDispatcher.instance.locale);
 
@@ -100,7 +103,9 @@ Future<void> pushHelper(
     }
     rethrow;
   } finally {
-    if (!_pushLock.locked) ForegroundServices.stopService('background_push');
+    if (stopForegroundService && !_pushLock.locked) {
+      ForegroundServices.stopService('background_push');
+    }
   }
 }
 

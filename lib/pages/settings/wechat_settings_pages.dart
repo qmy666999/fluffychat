@@ -8,6 +8,7 @@ import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/app_settings_launcher.dart';
 import 'package:fluffychat/utils/updates/app_update_service.dart';
 import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
+import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:flutter/services.dart';
@@ -252,8 +253,8 @@ class _SettingsGeneralPageState extends State<SettingsGeneralPage> {
         ),
         ListTile(
           title: Text(l10n.storageSpace),
-          subtitle: Text(l10n.featureComingSoon),
-          onTap: () => _showComingSoon(context),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.go('/rooms/settings/storage'),
         ),
       ],
     );
@@ -454,6 +455,82 @@ class SettingsHelpPage extends StatelessWidget {
               launchUrlString('https://github.com/qmy666999/fluffychat'),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/// 存储空间：只清「已经不在里面」的房间的本地缓存。
+///
+/// 退出的群/私聊会一直躺在本地数据库里，占地方也拖慢启动。这里不会替用户
+/// 主动退出任何房间（那会给对方发「你退出了群聊」），只清理已经离开的那些。
+class StorageSpacePage extends StatefulWidget {
+  const StorageSpacePage({super.key});
+
+  @override
+  State<StorageSpacePage> createState() => _StorageSpacePageState();
+}
+
+class _StorageSpacePageState extends State<StorageSpacePage> {
+  bool _cleaning = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
+    final client = Matrix.of(context).client;
+    final leftRooms = client.rooms
+        .where((room) => room.membership != Membership.join)
+        .toList();
+    final joinedCount = client.rooms.length - leftRooms.length;
+    return _WechatSettingsScaffold(
+      title: l10n.storageSpace,
+      children: [
+        ListTile(title: Text(l10n.joinedChats), trailing: Text('$joinedCount')),
+        ListTile(
+          title: Text(l10n.leftChats),
+          subtitle: Text(l10n.cleanLeftRoomsHint),
+          trailing: Text('${leftRooms.length}'),
+        ),
+        ListTile(
+          leading: const Icon(Icons.cleaning_services_outlined),
+          title: Text(l10n.cleanLeftRooms),
+          subtitle: const Text(''),
+          enabled: !_cleaning && leftRooms.isNotEmpty,
+          onTap: _cleaning ? null : () => _cleanLeftRooms(leftRooms),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _cleanLeftRooms(List<Room> rooms) async {
+    final l10n = L10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final client = Matrix.of(context).client;
+    final result = await showOkCancelAlertDialog(
+      context: context,
+      title: l10n.cleanLeftRooms,
+      message: l10n.cleanLeftRoomsConfirm('${rooms.length}'),
+      okLabel: l10n.ok,
+      cancelLabel: l10n.cancel,
+      isDestructive: true,
+    );
+    if (result != OkCancelResult.ok) return;
+    setState(() => _cleaning = true);
+    var count = 0;
+    for (final room in rooms) {
+      try {
+        await client.database.forgetRoom(room.id);
+        count++;
+      } catch (e, s) {
+        Logs().w('[storage] 清理失败 ${room.id}', e, s);
+      }
+    }
+    client.rooms.removeWhere((room) => room.membership != Membership.join);
+    if (!mounted) return;
+    setState(() => _cleaning = false);
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.cleanLeftRoomsDone('$count'))),
     );
   }
 }

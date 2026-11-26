@@ -4,6 +4,7 @@
 
 import 'dart:async';
 
+import 'package:fluffychat/utils/wechat/hidden_rooms_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:matrix/matrix.dart';
 
@@ -142,13 +143,19 @@ class FriendsData {
   List<FriendRequestEntry> incoming;
   List<FriendRequestEntry> outgoing;
 
+  /// 删过的好友留一份墓碑（userId → 删除时间），否则下一次 sync 扫到房间里
+  /// 那条旧的「接受好友」状态事件，又会把人自动加回来（删了重启又出现）。
+  Map<String, int> removedAt;
+
   FriendsData({
     List<FriendEntry>? friends,
     List<FriendRequestEntry>? incoming,
     List<FriendRequestEntry>? outgoing,
+    Map<String, int>? removedAt,
   }) : friends = friends ?? [],
        incoming = incoming ?? [],
-       outgoing = outgoing ?? [];
+       outgoing = outgoing ?? [],
+       removedAt = removedAt ?? {};
 
   int get pendingCount =>
       incoming.where((r) => r.status == FriendRequestStatus.pending).length;
@@ -191,6 +198,18 @@ class FriendsService {
       }
     }
     final requestsContent = client.accountData[requestsEventType]?.content;
+    final rawRemoved = friendsContent?['removed'];
+    if (rawRemoved is List) {
+      for (final item in rawRemoved) {
+        if (item is Map) {
+          final userId = item['user_id'];
+          final ts = item['ts'];
+          if (userId is String && userId.isNotEmpty) {
+            data.removedAt[userId] = ts is num ? ts.toInt() : 0;
+          }
+        }
+      }
+    }
     final rawIncoming = requestsContent?['incoming'];
     if (rawIncoming is List) {
       for (final item in rawIncoming) {
@@ -222,6 +241,9 @@ class FriendsService {
     if (userId == null) return;
     await client.setAccountData(userId, friendsEventType, {
       'friends': data.friends.map((f) => f.toJson()).toList(),
+      'removed': data.removedAt.entries
+          .map((e) => {'user_id': e.key, 'ts': e.value})
+          .toList(),
     });
     await client.setAccountData(userId, requestsEventType, {
       'incoming': data.incoming.map((r) => r.toIncomingJson()).toList(),
@@ -235,6 +257,7 @@ class FriendsService {
 
   Future<void> addFriend(FriendEntry friend) async {
     final data = load();
+    data.removedAt.remove(friend.userId);
     final existing = data.friend(friend.userId);
     if (existing != null) {
       existing
@@ -249,6 +272,7 @@ class FriendsService {
   Future<void> removeFriend(String userId) async {
     final data = load();
     data.friends.removeWhere((f) => f.userId == userId);
+    data.removedAt[userId] = DateTime.now().millisecondsSinceEpoch;
     await _save(data);
   }
 
@@ -462,11 +486,16 @@ class FriendsService {
 
   /// 删好友：本地名单删掉，并在私聊房间里留一条 removed 事件，
   /// 对方的客户端收到后会把自己名单里的你也删掉（双向处理）。
+  ///
+  /// 房间本身不退（`leaveRoom` 会给对方发「你退出了群聊」，而且以后加回来要
+  /// 从头进），而是记进 `com.dafeiyu.hidden_rooms`，会话列表按它过滤。
   Future<void> removeFriendBothWays(String userId) async {
     final me = client.userID!;
     await removeFriend(userId);
+    final directRoomIds = <String>[];
     for (final room in client.rooms) {
       if (room.directChatMatrixID != userId) continue;
+      directRoomIds.add(room.id);
       try {
         await client.setRoomStateWithKey(room.id, removedRoomEventType, me, {
           'by': me,
@@ -475,7 +504,13 @@ class FriendsService {
       } catch (e) {
         debugPrint('[friends] removed event failed: $e');
       }
-      break;
+    }
+    if (directRoomIds.isNotEmpty) {
+      try {
+        await HiddenRoomsService(client).hideAll(directRoomIds);
+      } catch (e) {
+        debugPrint('[friends] hide rooms failed: $e');
+      }
     }
   }
 
@@ -531,6 +566,8 @@ class FriendsService {
           final by = (event.content['by'] as String?) ?? event.stateKey;
           if (by == null || by == me) continue;
           if (data.isFriend(by)) continue;
+          // 主动删过的人不要再自动加回来（房间里的旧接受事件还在）。
+          if (data.removedAt.containsKey(by)) continue;
           // 名字/头像：新版客户端会把资料写进事件；老事件只能回落到房间成员信息。
           final member = room.getState(EventTypes.RoomMember, by);
           final eventName = (event.content['name'] as String?)?.trim();

@@ -17,7 +17,11 @@ abstract class AppConfig {
   static const String inviteLinkPrefix = 'https://matrix.to/#/';
   static const String deepLinkPrefix = 'im.fluffychat://chat/';
   static const String schemePrefix = 'matrix:';
-  static const String pushNotificationsChannelId = 'fluffychat_push';
+
+  /// 新消息通知走的渠道。带上 `_v2` 是因为旧渠道 `fluffychat_push` 在系统里
+  /// 已经被建成低重要度，属性改不了，只能换 ID 重新建。见
+  /// `lib/utils/notifications/app_notifications.dart`。
+  static const String pushNotificationsChannelId = 'messages_v2';
   static const String pushNotificationsAppId = 'chat.fluffychatx';
   static const double borderRadius = 18.0;
   static const double spaceBorderRadius = 11.0;

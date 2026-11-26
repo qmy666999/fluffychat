@@ -21,6 +21,7 @@ import 'package:fluffychat/utils/moments/moments_service.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/show_scaffold_dialog.dart';
 import 'package:fluffychat/utils/show_update_snackbar.dart';
+import 'package:fluffychat/utils/wechat/hidden_rooms_service.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_modal_action_popup.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
@@ -172,10 +173,32 @@ class ChatListController extends State<ChatList>
     // 朋友圈只从「发现 → 朋友圈」进入，房间本身从会话列表里彻底隐藏
     // （包括老版本每个账号各建一个、名字都叫「朋友圈」的重复房间）。
     final moments = MomentsService(client);
+    // 删掉的好友对应的私聊房间：房间还在（没退群，历史都在），只是不列出来。
+    final hiddenRooms = HiddenRoomsService(client).load();
     return client.rooms
         .where(getRoomFilterByActiveFilter(activeFilter))
+        .where((room) => room.membership == Membership.join)
+        .where((room) => !hiddenRooms.contains(room.id))
         .where((room) => !moments.hidesRoom(room))
         .toList();
+  }
+
+  /// 会话列表下拉刷新：主动 sync 一次服务器，顺便把好友名单/隐藏列表重新对一遍。
+  ///
+  /// 必须 await 到真正结束，不然 RefreshIndicator 的转圈不会收回去。
+  Future<void> refreshChatList() async {
+    final client = Matrix.of(context).client;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final l10n = L10n.of(context);
+    try {
+      await client.sync(timeout: 5000);
+      await HiddenRoomsService.autoUnhide(client);
+      await FriendsService(client).syncFromRooms();
+      if (mounted) setState(() {});
+    } catch (e, s) {
+      Logs().w('[refresh] 下拉刷新失败', e, s);
+      messenger?.showSnackBar(SnackBar(content: Text(l10n.refreshFailed)));
+    }
   }
 
   bool isSearchMode = false;
@@ -407,6 +430,7 @@ class ChatListController extends State<ChatList>
   }
 
   StreamSubscription? _onRoomTagUpdate;
+  StreamSubscription? _onHiddenRoomsSync;
 
   @override
   void didUpdateWidget(covariant ChatList oldWidget) {
@@ -478,6 +502,16 @@ class ChatListController extends State<ChatList>
         )
         .listen(_updateRoomTags);
 
+    // 隐藏的会话（删掉的好友）：对方又发消息、或者自己在这里发言，就把它放回列表。
+    final syncClient = Matrix.of(context).client;
+    _onHiddenRoomsSync = syncClient.onSync.stream.listen((_) {
+      unawaited(
+        HiddenRoomsService.autoUnhide(syncClient).then((changed) {
+          if (changed && mounted) setState(() {});
+        }),
+      );
+    });
+
     // 椤堕儴绛涢€夋爣绛炬暣鎺掑凡缁忕Щ闄わ紙瑙?chat_list_body.dart锛夛紝娌℃湁鍒囨崲鍏ュ彛浜嗭紝
     // 鎵€浠ヨ繖閲屽浐瀹氭垚銆屽叏閮ㄣ€嶏紝閬垮厤涔嬪墠瀛樹笅鐨勬湭璇?缇ょ粍/鏍囩绛涢€夋妸浜哄崱浣忋€?
     activeFilter = ActiveFilter.allChats;
@@ -494,6 +528,7 @@ class ChatListController extends State<ChatList>
     _intentFileStreamSubscription?.cancel();
     _callEventSubscription?.cancel();
     _onRoomTagUpdate?.cancel();
+    _onHiddenRoomsSync?.cancel();
     scrollController.removeListener(_onScroll);
     searchController.dispose();
     searchFocusNode.dispose();

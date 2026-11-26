@@ -3206,5 +3206,18 @@
   "keepAliveTitle": "Background notification",
   "keepAliveHint": "Android requires a persistent notification while the app receives messages in the background. It uses the lowest importance: no status bar icon, no sound, no vibration and no heads-up banner. You can only find it in the silent section of your notification shade.",
   "openSystemNotificationSettings": "Open system notification settings",
-  "openNotificationSettingsFailed": "Could not open the system settings, please open Settings → Apps → Notifications manually"
+  "openNotificationSettingsFailed": "Could not open the system settings, please open Settings → Apps → Notifications manually",
+  "messagesChannelName": "Messages",
+  "messagesChannelDescription": "Alerts for new messages",
+  "callsChannelName": "Voice and video calls",
+  "callsChannelDescription": "Incoming calls and call invites",
+  "refreshFailed": "Refresh failed, please check your network",
+  "joinedChats": "Joined chats",
+  "leftChats": "Left chats",
+  "cleanLeftRooms": "Clean up left rooms",
+  "cleanLeftRoomsHint": "Only local cache is cleared, nothing changes on the server",
+  "cleanLeftRoomsConfirm": "The local cache of {count} left chats will be cleared. The messages stay on the server.",
+  "@cleanLeftRoomsConfirm": {"placeholders": {"count": {"type": "String"}}},
+  "cleanLeftRoomsDone": "Cleaned up {count} chats",
+  "@cleanLeftRoomsDone": {"placeholders": {"count": {"type": "String"}}}
 }

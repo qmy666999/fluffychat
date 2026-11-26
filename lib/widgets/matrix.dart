@@ -14,9 +14,11 @@ import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_file_extension.dar
 import 'package:fluffychat/utils/notification_background_handler.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/push_helper.dart';
+import 'package:fluffychat/utils/start_push_foreground_service.dart';
 import 'package:fluffychat/utils/uia_request_manager.dart';
 import 'package:fluffychat/utils/voip/matrix_voip.dart';
 import 'package:fluffychat/utils/wechat/reminder_service.dart';
+import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/app_update_dialog.dart';
 import 'package:fluffychat/widgets/fluffy_chat_app.dart';
@@ -36,6 +38,7 @@ import '../config/setting_keys.dart';
 import '../pages/key_verification/key_verification_dialog.dart';
 import '../utils/account_bundles.dart';
 import '../utils/background_push.dart';
+import '../utils/notifications/app_notifications.dart';
 import 'local_notifications_extension.dart';
 
 class Matrix extends StatefulWidget {
@@ -184,6 +187,13 @@ class MatrixState extends State<Matrix> {
   final onLogoutSub = <String, StreamSubscription<LoginState>>{};
   final onUiaRequest = <String, StreamSubscription<UiaRequest>>{};
 
+  /// 全 App 共用一个通知插件实例：建渠道、弹本地通知、处理点击都走它。
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
+
+  /// 每个会话「上一次弹过通知的事件」，避免同一条消息重复弹。
+  final Map<String, String> _notifiedEventIds = {};
+
   String? _cachedPassword;
   Timer? _cachedPasswordClearTimer;
 
@@ -208,6 +218,10 @@ class MatrixState extends State<Matrix> {
   @override
   void initState() {
     super.initState();
+    // 初始状态要拿系统的：否则第一次 sync 时 _lifecycleState 还是 null，
+    // 会被当成「不在前台」，一启动就在通知栏刷一堆通知。
+    _lifecycleState =
+        WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed;
     _listener = AppLifecycleListener(onStateChange: didChangeAppLifecycleState);
     initMatrix();
     _scheduleUpdateCheck();
@@ -325,7 +339,6 @@ class MatrixState extends State<Matrix> {
           FluffyChatApp.router.go('/');
         });
     onUiaRequest[name] ??= c.onUiaRequest.stream.listen(uiaRequestHandler);
-    final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
     if (PlatformInfos.isWeb || PlatformInfos.isDesktop) {
       c.onSync.stream.first.then((s) {
         if (kIsWeb) {
@@ -335,6 +348,14 @@ class MatrixState extends State<Matrix> {
           showLocalNotification,
         );
       });
+    } else if (PlatformInfos.isMobile) {
+      // 我们的服务器没有配推送网关（手机上也未必装了 UnifiedPush 分发器），
+      // 所以后台收不到推送就永远不会有通知。这里改成：App 不在前台时，每次
+      // sync 完自己给自己发一条本地通知，效果和推送通知一样（同一条渠道、
+      // 同样的「消息样式」，点击也能回到对应会话）。
+      onNotification[name] ??= c.onSync.stream.listen((_) {
+        unawaited(_showBackgroundNotifications(c));
+      });
     }
     onReceipts[name] ??= c.onSync.stream.listen(
       (syncUpdate) => cancelNotificationsOnSync(
@@ -343,7 +364,7 @@ class MatrixState extends State<Matrix> {
         c.userID!,
         // ignore: use_build_context_synchronously
         L10n.of(context),
-        flutterLocalNotificationsPlugin,
+        _localNotifications,
       ),
     );
     // 1 对 1 通话：每个客户端一个实例，负责信令、铃声和通话状态。
@@ -394,7 +415,7 @@ class MatrixState extends State<Matrix> {
       );
     }
     if (backgroundPush == null) {
-      await FlutterLocalNotificationsPlugin().initialize(
+      await _localNotifications.initialize(
         settings: InitializationSettings(
           linux: LinuxInitializationSettings(
             defaultActionName: FluffyChatNotificationActions.open.name,
@@ -411,6 +432,22 @@ class MatrixState extends State<Matrix> {
           l10n: null,
         ),
       );
+      if (PlatformInfos.isAndroid) {
+        // Android 13 起没有 POST_NOTIFICATIONS 权限的话，通知会被系统直接丢弃，
+        // 而且不会报错。之前只有 UnifiedPush 注册成功时才会申请权限，等于永远
+        // 申请不到，所以这里启动就先要一次。
+        await _localNotifications
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >()
+            ?.requestNotificationsPermission();
+        // 渠道要在第一次 show 之前建好：高/最高/最低三个分开，名字不能再用
+        // 占位符，历史坏渠道顺便删掉。
+        final l10n = await L10n.delegate.load(
+          PlatformDispatcher.instance.locale,
+        );
+        await AppNotifications.ensureChannels(_localNotifications, l10n);
+      }
     }
 
     for (final c in widget.clients) {
@@ -430,9 +467,85 @@ class MatrixState extends State<Matrix> {
           ? null
           : PresenceType.unavailable;
       if (PlatformInfos.isMobile) {
-        client.backgroundSync = foreground;
+        // 没有推送网关，后台要收消息只能靠 sync 一直跑着：所以进后台也不关
+        // backgroundSync，否则一按 Home 就再也收不到通知了。
+        client.backgroundSync = true;
         client.requestHistoryOnLimitedTimeline = !foreground;
-        Logs().v('Set background sync to', foreground);
+        Logs().v('Set background sync to', true);
+      }
+    }
+    if (PlatformInfos.isMobile) {
+      unawaited(_syncForegroundService(foreground));
+    }
+  }
+
+  /// 前后台切换时开/关常驻前台服务。
+  ///
+  /// 后台跑着 sync 却没有前台服务时，系统随时可能把进程掐掉；有了前台服务
+  /// 才能稳定收消息。前台服务自带一条最低优先级的通知（渠道
+  /// `keep_alive_v2`，静音、不进状态栏图标），回前台就把它收掉。
+  Future<void> _syncForegroundService(bool foreground) async {
+    try {
+      if (foreground) {
+        Logs().i('[fgs] app resumed, stop keep-alive service');
+        await ForegroundServices.stopService('background_push');
+      } else {
+        Logs().i('[fgs] app in background, start keep-alive service');
+        await ForegroundServices.startService('background_push');
+      }
+    } catch (e, s) {
+      // Android 12+ 从后台启动前台服务可能被系统拒绝，这里只是尽量争取，
+      // 失败也不影响消息通知本身。
+      Logs().w('[fgs] 前台服务切换失败', e, s);
+    }
+  }
+
+  /// App 不在前台时，把「有新未读消息的会话」变成系统通知。
+  ///
+  /// 走的是 `pushHelper` 这条现成的路：它负责判断推送规则（免打扰的会话不
+  /// 弹）、拼消息样式、下载头像、挂上回复/标记已读按钮，点击也能直接回到
+  /// 对应会话。我们只是把「服务器推过来的通知」换成「本地 sync 拼出来的
+  /// 通知」，因为这台服务器没有配推送网关。
+  Future<void> _showBackgroundNotifications(Client client) async {
+    if (!PlatformInfos.isMobile) return;
+    if (_lifecycleState == AppLifecycleState.resumed) return;
+    if (!client.isLogged()) return;
+    // 设置 → 新消息通知里关掉了「接收新消息通知」就什么都不弹。
+    if (!WechatPrefs.notifyReceive) return;
+    final l10n = await L10n.delegate.load(PlatformDispatcher.instance.locale);
+    if (!mounted) return;
+
+    for (final room in client.rooms) {
+      final lastEvent = room.lastEvent;
+      if (lastEvent == null) continue;
+      if (lastEvent.senderId == client.userID) continue;
+      if (room.notificationCount <= 0) continue;
+      if (room.membership != Membership.join) continue;
+      final key = '${client.clientName}|${room.id}';
+      if (_notifiedEventIds[key] == lastEvent.eventId) continue;
+      _notifiedEventIds[key] = lastEvent.eventId;
+      Logs().i('[notif] room=${room.id} event=${lastEvent.eventId}');
+      try {
+        await pushHelper(
+          PushNotification(
+            roomId: room.id,
+            eventId: lastEvent.eventId,
+            counts: PushNotificationCounts(unread: room.notificationCount),
+            devices: [
+              PushNotificationDevice(data: {'client_name': client.clientName}),
+            ],
+            prio: 'high',
+          ),
+          clients: [client],
+          l10n: l10n,
+          activeRoomId: activeRoomId,
+          flutterLocalNotificationsPlugin: _localNotifications,
+          // App 自己就在前台服务里跑 sync，弹完通知不能把服务收掉，
+          // 否则常驻通知会跟着消失、进程也失去保护。
+          stopForegroundService: false,
+        );
+      } catch (e, s) {
+        Logs().w('[notif] 发送通知失败', e, s);
       }
     }
   }
