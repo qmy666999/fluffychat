@@ -3221,5 +3221,9 @@
   "cleanLeftRoomsDone": "Cleaned up {count} chats",
   "@cleanLeftRoomsDone": {"placeholders": {"count": {"type": "String"}}},
   "switchAccount": "Switch account",
-  "logoutThisAccount": "Log out of this account"
+  "logoutThisAccount": "Log out of this account",
+  "notificationTest": "Send a test notification",
+  "notificationTestTitle": "Test notification",
+  "notificationTestBody": "If you can see this, permissions and channels work.",
+  "notificationTestBlocked": "Notifications are blocked. Enable them in system settings."
 }

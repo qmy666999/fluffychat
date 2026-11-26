@@ -149,7 +149,10 @@ Future<void> _tryPushHelper(
   updateAppBadge(notification.counts?.unread ?? 0);
 
   if (event == null) {
-    Logs().v('Notification is a clearing indicator.');
+    Logs().i(
+      '[notif] pushHelper: event not found (clearing indicator) '
+      'room=${notification.roomId} event=${notification.eventId}',
+    );
     if (client.syncPending) return;
     if (clients?.length == 1 && (notification.counts?.unread == 0)) {
       await flutterLocalNotificationsPlugin.cancelAll();
@@ -174,7 +177,10 @@ Future<void> _tryPushHelper(
   Logs().v('Push helper got notification event of type ${event.type}.');
 
   if (!client.pushruleEvaluator.match(event).notify) {
-    Logs().i('Push helper: filtered by client-side push rules.');
+    Logs().i(
+      '[notif] pushHelper: filtered by push rules '
+      'room=${event.roomId} event=${event.eventId}',
+    );
     return;
   }
 
@@ -188,7 +194,7 @@ Future<void> _tryPushHelper(
   if (notification.roomId != null &&
       activeRoomId == notification.roomId &&
       WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-    Logs().v('Room is in foreground. Stop push helper here.');
+    Logs().i('[notif] pushHelper: room is in foreground, skip');
     return;
   }
 
@@ -247,31 +253,9 @@ Future<void> _tryPushHelper(
 
   final roomName = event.room.getLocalizedDisplayname(MatrixLocals(l10n));
 
-  final notificationGroupId = event.room.isDirectChat
-      ? 'directChats'
-      : 'groupChats';
-  final groupName = event.room.isDirectChat ? l10n.directChats : l10n.groups;
-
-  final messageRooms = AndroidNotificationChannelGroup(
-    notificationGroupId,
-    groupName,
-  );
-  final roomsChannel = AndroidNotificationChannel(
-    event.room.id,
-    roomName,
-    groupId: notificationGroupId,
-  );
-
-  await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin
-      >()
-      ?.createNotificationChannelGroup(messageRooms);
-  await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin
-      >()
-      ?.createNotificationChannel(roomsChannel);
+  // 渠道统一用 AppConfig.pushNotificationsChannelId（messages_v2，high）。
+  // 以前这里按房间建渠道（渠道 ID = 房间 ID），那些渠道都是默认/静默重要度，
+  // 消息发进去会被系统直接丢掉，而且会在系统设置里堆一堆以房间名命名的类别。
 
   final androidPlatformChannelSpecifics = AndroidNotificationDetails(
     AppConfig.pushNotificationsChannelId,

@@ -3221,5 +3221,9 @@
   "cleanLeftRoomsDone": "已清理 {count} 个会话",
   "@cleanLeftRoomsDone": {"placeholders": {"count": {"type": "String"}}},
   "switchAccount": "切换账号",
-  "logoutThisAccount": "退出这个账号"
+  "logoutThisAccount": "退出这个账号",
+  "notificationTest": "发送测试通知",
+  "notificationTestTitle": "测试通知",
+  "notificationTestBody": "能看到这条通知，说明通知权限和渠道都正常。",
+  "notificationTestBlocked": "系统通知被关掉了，请到系统设置里打开。"
 }

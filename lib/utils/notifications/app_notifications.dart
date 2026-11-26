@@ -82,5 +82,51 @@ class AppNotifications {
         await android.deleteNotificationChannel(channelId: id);
       } catch (_) {}
     }
+
+    // 老版本还给每个房间单独建过渠道（渠道 ID 就是房间 ID，以 `!` 开头），
+    // 这些渠道同样都是静默级别，消息发进去照样被系统丢掉。新版本统一只用
+    // `messages_v2`，这里把房间渠道一并清掉。
+    try {
+      final channels = await android.getNotificationChannels();
+      for (final channel in channels ?? const <AndroidNotificationChannel>[]) {
+        if (!channel.id.startsWith('!')) continue;
+        try {
+          await android.deleteNotificationChannel(channelId: channel.id);
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
+  /// 发一条测试通知，手动验证「权限 + 渠道 + show」三件事是否真的通了。
+  ///
+  /// 返回 `false` 表示系统通知权限没开（或不是 Android），这时点再多次也
+  /// 不会有通知 —— 只能去系统设置里打开。
+  static Future<bool> showTestNotification(
+    FlutterLocalNotificationsPlugin plugin,
+    L10n l10n,
+  ) async {
+    final android = plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (android == null) return false;
+    final enabled = await android.areNotificationsEnabled() ?? true;
+    if (!enabled) return false;
+    await ensureChannels(plugin, l10n);
+    await plugin.show(
+      id: 'fluffychatx_notification_test'.hashCode,
+      title: l10n.notificationTestTitle,
+      body: l10n.notificationTestBody,
+      notificationDetails: NotificationDetails(
+        android: AndroidNotificationDetails(
+          messagesChannelId,
+          l10n.messagesChannelName,
+          importance: Importance.high,
+          priority: Priority.high,
+          category: AndroidNotificationCategory.message,
+        ),
+      ),
+    );
+    return true;
   }
 }

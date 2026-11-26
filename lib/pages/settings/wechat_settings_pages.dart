@@ -6,6 +6,7 @@ import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/app_settings_launcher.dart';
+import 'package:fluffychat/utils/notifications/app_notifications.dart';
 import 'package:fluffychat/utils/updates/app_update_service.dart';
 import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
@@ -36,6 +37,24 @@ class SettingsNotificationsPage extends StatefulWidget {
 
 class _SettingsNotificationsPageState extends State<SettingsNotificationsPage> {
   bool _openingSettings = false;
+  bool _sendingTest = false;
+
+  Future<void> _sendTestNotification() async {
+    if (_sendingTest) return;
+    setState(() => _sendingTest = true);
+    final l10n = L10n.of(context);
+    final ok = await AppNotifications.showTestNotification(
+      Matrix.of(context).localNotifications,
+      l10n,
+    );
+    if (!mounted) return;
+    setState(() => _sendingTest = false);
+    if (!ok) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.notificationTestBlocked)));
+    }
+  }
 
   Future<void> _openSystemNotificationSettings() async {
     if (_openingSettings) return;
@@ -153,6 +172,19 @@ class _SettingsNotificationsPageState extends State<SettingsNotificationsPage> {
           onChanged: (value) => setState(() {
             WechatPrefs.setNotifyVibrate(value);
           }),
+        ),
+        ListTile(
+          leading: const Icon(Icons.notification_add_outlined),
+          title: Text(l10n.notificationTest),
+          subtitle: Text(l10n.notificationTestBody),
+          trailing: _sendingTest
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.chevron_right),
+          onTap: _sendingTest ? null : _sendTestNotification,
         ),
       ],
     );

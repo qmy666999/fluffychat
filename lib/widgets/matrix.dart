@@ -186,6 +186,7 @@ class MatrixState extends State<Matrix> {
   final onReceipts = <String, StreamSubscription>{};
   final onLogoutSub = <String, StreamSubscription<LoginState>>{};
   final onUiaRequest = <String, StreamSubscription<UiaRequest>>{};
+  final onTimelineEventSub = <String, StreamSubscription>{};
 
   /// 全 App 共用一个通知插件实例：建渠道、弹本地通知、处理点击都走它。
   final FlutterLocalNotificationsPlugin _localNotifications =
@@ -193,6 +194,9 @@ class MatrixState extends State<Matrix> {
 
   /// 每个会话「上一次弹过通知的事件」，避免同一条消息重复弹。
   final Map<String, String> _notifiedEventIds = {};
+
+  /// 供设置页的「发送测试通知」使用。
+  FlutterLocalNotificationsPlugin get localNotifications => _localNotifications;
 
   String? _cachedPassword;
   Timer? _cachedPasswordClearTimer;
@@ -366,6 +370,11 @@ class MatrixState extends State<Matrix> {
       onNotification[name] ??= c.onSync.stream.listen((_) {
         unawaited(_showBackgroundNotifications(c));
       });
+      // 直接盯「新消息事件」比等 sync 后扫房间更及时、也不依赖服务器下发的
+      // 未读数：单聊群聊一视同仁，收到就弹。
+      onTimelineEventSub[name] ??= c.onTimelineEvent.stream.listen((event) {
+        unawaited(_notifyForEvent(c, event));
+      });
     }
     onReceipts[name] ??= c.onSync.stream.listen(
       (syncUpdate) => cancelNotificationsOnSync(
@@ -392,6 +401,8 @@ class MatrixState extends State<Matrix> {
     onNotification.remove(name);
     onReceipts[name]?.cancel();
     onReceipts.remove(name);
+    onTimelineEventSub[name]?.cancel();
+    onTimelineEventSub.remove(name);
   }
 
   Future<void> initMatrix() async {
@@ -424,7 +435,19 @@ class MatrixState extends State<Matrix> {
         },
       );
     }
-    if (backgroundPush == null) {
+    // 注意：通知插件必须在所有平台都初始化。以前这段被 `backgroundPush ==
+    // null` 挡着，而手机端一定会创建 BackgroundPush（它自己另有一个通知插件
+    // 实例），结果手机上的 `_localNotifications` 从来没过 initialize：渠道不建、
+    // 权限不申请、show() 发不出去 —— 这就是「一条通知都没有」的根因。
+    await _initLocalNotifications();
+
+    for (final c in widget.clients) {
+      _registerSubs(c.clientName);
+    }
+  }
+
+  Future<void> _initLocalNotifications() async {
+    try {
       await _localNotifications.initialize(
         settings: InitializationSettings(
           linux: LinuxInitializationSettings(
@@ -442,26 +465,29 @@ class MatrixState extends State<Matrix> {
           l10n: null,
         ),
       );
-      if (PlatformInfos.isAndroid) {
-        // Android 13 起没有 POST_NOTIFICATIONS 权限的话，通知会被系统直接丢弃，
-        // 而且不会报错。之前只有 UnifiedPush 注册成功时才会申请权限，等于永远
-        // 申请不到，所以这里启动就先要一次。
-        await _localNotifications
-            .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin
-            >()
-            ?.requestNotificationsPermission();
-        // 渠道要在第一次 show 之前建好：高/最高/最低三个分开，名字不能再用
-        // 占位符，历史坏渠道顺便删掉。
-        final l10n = await L10n.delegate.load(
-          PlatformDispatcher.instance.locale,
-        );
-        await AppNotifications.ensureChannels(_localNotifications, l10n);
-      }
+      Logs().i('[notif] local notification plugin initialized');
+    } catch (e, s) {
+      Logs().w('[notif] 初始化本地通知插件失败', e, s);
+      return;
     }
-
-    for (final c in widget.clients) {
-      _registerSubs(c.clientName);
+    if (!PlatformInfos.isAndroid) return;
+    try {
+      // Android 13 起没有 POST_NOTIFICATIONS 权限的话，通知会被系统直接丢弃，
+      // 而且不会报错。之前只有 UnifiedPush 注册成功时才会申请权限，等于永远
+      // 申请不到，所以这里启动就先要一次。
+      final granted = await _localNotifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.requestNotificationsPermission();
+      Logs().i('[notif] notification permission granted: $granted');
+      // 渠道要在第一次 show 之前建好：高/最高/最低三个分开，名字不能再用
+      // 占位符，历史坏渠道顺便删掉。
+      final l10n = await L10n.delegate.load(PlatformDispatcher.instance.locale);
+      await AppNotifications.ensureChannels(_localNotifications, l10n);
+      Logs().i('[notif] notification channels ensured');
+    } catch (e, s) {
+      Logs().w('[notif] 申请通知权限/创建渠道失败', e, s);
     }
   }
 
@@ -517,11 +543,7 @@ class MatrixState extends State<Matrix> {
   /// 对应会话。我们只是把「服务器推过来的通知」换成「本地 sync 拼出来的
   /// 通知」，因为这台服务器没有配推送网关。
   Future<void> _showBackgroundNotifications(Client client) async {
-    if (!PlatformInfos.isMobile) return;
-    if (_lifecycleState == AppLifecycleState.resumed) return;
-    if (!client.isLogged()) return;
-    // 设置 → 新消息通知里关掉了「接收新消息通知」就什么都不弹。
-    if (!WechatPrefs.notifyReceive) return;
+    if (!_mayNotify(client)) return;
     final l10n = await L10n.delegate.load(PlatformDispatcher.instance.locale);
     if (!mounted) return;
 
@@ -531,32 +553,84 @@ class MatrixState extends State<Matrix> {
       if (lastEvent.senderId == client.userID) continue;
       if (room.notificationCount <= 0) continue;
       if (room.membership != Membership.join) continue;
-      final key = '${client.clientName}|${room.id}';
-      if (_notifiedEventIds[key] == lastEvent.eventId) continue;
-      _notifiedEventIds[key] = lastEvent.eventId;
-      Logs().i('[notif] room=${room.id} event=${lastEvent.eventId}');
-      try {
-        await pushHelper(
-          PushNotification(
-            roomId: room.id,
-            eventId: lastEvent.eventId,
-            counts: PushNotificationCounts(unread: room.notificationCount),
-            devices: [
-              PushNotificationDevice(data: {'client_name': client.clientName}),
-            ],
-            prio: 'high',
-          ),
-          clients: [client],
-          l10n: l10n,
-          activeRoomId: activeRoomId,
-          flutterLocalNotificationsPlugin: _localNotifications,
-          // App 自己就在前台服务里跑 sync，弹完通知不能把服务收掉，
-          // 否则常驻通知会跟着消失、进程也失去保护。
-          stopForegroundService: false,
-        );
-      } catch (e, s) {
-        Logs().w('[notif] 发送通知失败', e, s);
-      }
+      await _pushRoomNotification(
+        client,
+        room,
+        lastEvent,
+        unread: room.notificationCount,
+        l10n: l10n,
+      );
+    }
+  }
+
+  /// 收到一条新时间线事件时判断要不要弹通知。
+  ///
+  /// 与 `_showBackgroundNotifications` 的区别：这条不看服务器下发的未读数，
+  /// 只看「是不是别人发的新消息」+「App 在不在前台」，单聊群聊完全同一套逻辑。
+  Future<void> _notifyForEvent(Client client, Event event) async {
+    if (!_mayNotify(client)) return;
+    if (event.senderId == client.userID) return;
+    final room = event.room;
+    if (room.membership != Membership.join) return;
+    if (event.type != EventTypes.Message &&
+        event.type != EventTypes.Encrypted &&
+        event.type != EventTypes.Sticker) {
+      return;
+    }
+    final l10n = await L10n.delegate.load(PlatformDispatcher.instance.locale);
+    if (!mounted) return;
+    await _pushRoomNotification(
+      client,
+      room,
+      event,
+      unread: room.notificationCount < 1 ? 1 : room.notificationCount,
+      l10n: l10n,
+    );
+  }
+
+  /// 弹通知前后的公共判断：平台、前后台、登录状态、设置开关。
+  bool _mayNotify(Client client) {
+    if (!PlatformInfos.isMobile) return false;
+    if (_lifecycleState == AppLifecycleState.resumed) return false;
+    if (!client.isLogged()) return false;
+    // 设置 → 新消息通知里关掉了「接收新消息通知」就什么都不弹。
+    if (!WechatPrefs.notifyReceive) return false;
+    return true;
+  }
+
+  /// 把一个会话里的某条事件变成系统通知（同一条只弹一次）。
+  Future<void> _pushRoomNotification(
+    Client client,
+    Room room,
+    Event event, {
+    required int unread,
+    required L10n l10n,
+  }) async {
+    final key = '${client.clientName}|${room.id}';
+    if (_notifiedEventIds[key] == event.eventId) return;
+    _notifiedEventIds[key] = event.eventId;
+    Logs().i('[notif] room=${room.id} event=${event.eventId}');
+    try {
+      await pushHelper(
+        PushNotification(
+          roomId: room.id,
+          eventId: event.eventId,
+          counts: PushNotificationCounts(unread: unread),
+          devices: [
+            PushNotificationDevice(data: {'client_name': client.clientName}),
+          ],
+          prio: 'high',
+        ),
+        clients: [client],
+        l10n: l10n,
+        activeRoomId: activeRoomId,
+        flutterLocalNotificationsPlugin: _localNotifications,
+        // App 自己就在前台服务里跑 sync，弹完通知不能把服务收掉，
+        // 否则常驻通知会跟着消失、进程也失去保护。
+        stopForegroundService: false,
+      );
+    } catch (e, s) {
+      Logs().w('[notif] 发送通知失败', e, s);
     }
   }
 
@@ -584,11 +658,16 @@ class MatrixState extends State<Matrix> {
     for (final sub in onReceipts.values) {
       sub.cancel();
     }
+    for (final sub in onTimelineEventSub.values) {
+      sub.cancel();
+    }
     onRoomKeyRequestSub.clear();
     onKeyVerificationRequestSub.clear();
     onLogoutSub.clear();
     onNotification.clear();
     onUiaRequest.clear();
+    onReceipts.clear();
+    onTimelineEventSub.clear();
 
     voiceMessageEventId.dispose();
 
