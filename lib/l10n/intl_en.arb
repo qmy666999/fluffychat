@@ -3002,5 +3002,11 @@
                 "type": "String"
             }
         }
-    }
+    },
+  "audioFavorite": "Favorite",
+  "audioFavorited": "Saved",
+  "audioFavoriteRemoved": "Removed from favorites",
+  "audioQuote": "Quote",
+  "audioMultiSelect": "Select",
+  "redactConfirm": "Unsend this message?"
 }

@@ -24,6 +24,7 @@ import 'package:matrix/matrix.dart';
 
 import '../../../config/app_config.dart';
 import '../sticker_picker_dialog.dart';
+import 'audio_actions_menu.dart';
 import 'message_content.dart';
 import 'message_reactions.dart';
 import 'reply_content.dart';
@@ -426,6 +427,17 @@ class Message extends StatelessWidget {
                                     ? null
                                     : () {
                                         HapticFeedback.heavyImpact();
+                                        if (event.type == EventTypes.Message &&
+                                            event.messageType ==
+                                                MessageTypes.Audio) {
+                                          showAudioActionsMenu(
+                                            context,
+                                            event: event,
+                                            onSelect: onSelect,
+                                            onReply: onSwipe,
+                                          );
+                                          return;
+                                        }
                                         onSelect(event);
                                       },
                                 child: _AnimateIn(

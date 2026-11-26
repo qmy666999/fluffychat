@@ -3,12 +3,8 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import 'dart:async';
 import 'dart:io';
 
-import 'package:async/async.dart';
-import 'package:fluffychat/config/app_config.dart';
-import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/utils/error_reporter.dart';
 import 'package:fluffychat/utils/file_description.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
@@ -21,16 +17,18 @@ import 'package:matrix/matrix.dart';
 import 'package:ogg_caf_converter/ogg_caf_converter.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../../../utils/matrix_sdk_extensions/event_extension.dart';
 import '../../../widgets/fluffy_chat_app.dart';
 import '../../../widgets/matrix.dart';
 
+/// 微信样式的语音气泡：一个胶囊，里面是时长（例如 `2"`）和一个喇叭图标。
+/// 宽度随时长变化，没有进度条，点击气泡播放 / 暂停。
 class AudioPlayerWidget extends StatefulWidget {
   final Color color;
   final Color linkColor;
   final double fontSize;
   final Event event;
 
+  /// 录音波形采样数（录音界面在用，这里保留以保持兼容）。
   static const int wavesCount = 40;
 
   const AudioPlayerWidget(
@@ -47,18 +45,38 @@ class AudioPlayerWidget extends StatefulWidget {
 
 enum AudioPlayerStatus { notDownloaded, downloading, downloaded }
 
-class AudioPlayerState extends State<AudioPlayerWidget> {
-  static const double buttonSize = 36;
+class AudioPlayerState extends State<AudioPlayerWidget>
+    with SingleTickerProviderStateMixin {
+  static const double _bubbleHeight = 40;
+  static const double _minBubbleWidth = 80;
+  static const double _maxBubbleWidth = 200;
 
   AudioPlayerStatus status = AudioPlayerStatus.notDownloaded;
   double? _downloadProgress;
+  bool _pulseWanted = false;
 
   late final MatrixState matrix;
-  List<int>? _waveform;
-  String? _durationString;
+  late final AnimationController _pulseController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 600),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    matrix = Matrix.of(context);
+
+    if (matrix.voiceMessageEventId.value == widget.event.eventId &&
+        matrix.audioPlayer != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(matrix.context).clearMaterialBanners();
+      });
+    }
+  }
 
   @override
   void dispose() {
+    _pulseController.dispose();
     super.dispose();
     final audioPlayer = matrix.voiceMessageEventId.value != widget.event.eventId
         ? null
@@ -224,89 +242,43 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
     );
   }
 
-  Future<void> _toggleSpeed() async {
-    final audioPlayer = matrix.audioPlayer;
-    if (audioPlayer == null) return;
-    switch (audioPlayer.speed) {
-      case 1.0:
-        await audioPlayer.setSpeed(1.25);
-        break;
-      case 1.25:
-        await audioPlayer.setSpeed(1.5);
-        break;
-      case 1.5:
-        await audioPlayer.setSpeed(2.0);
-        break;
-      case 2.0:
-        await audioPlayer.setSpeed(0.5);
-        break;
-      case 0.5:
-      default:
-        await audioPlayer.setSpeed(1.0);
-        break;
-    }
-    setState(() {});
-  }
-
-  List<int>? _getWaveform() {
-    final eventWaveForm = widget.event.content
-        .tryGetMap<String, Object?>('org.matrix.msc1767.audio')
-        ?.tryGetList<int>('waveform');
-    if (eventWaveForm == null || eventWaveForm.isEmpty) {
-      return null;
-    }
-    // Newer versions of this MSC define 256 as the maximum instead of 1024.
-    // Hard to determine which version we should follow. At the time of writing
-    // this, Element X still sends 1024 while Mautrix WhatsApp uses 256.
-    // https://github.com/matrix-org/matrix-spec-proposals/blob/travis/msc/audio-waveform/proposals/3246-audio-waveform.md#unstable-prefix
-    if (!eventWaveForm.any((value) => value > 256)) {
-      _maxWaveForm = 256;
-    }
-
-    while (eventWaveForm.length < AudioPlayerWidget.wavesCount) {
-      for (var i = 0; i < eventWaveForm.length; i = i + 2) {
-        eventWaveForm.insert(i, eventWaveForm[i]);
-      }
-    }
-    var i = 0;
-    final step = (eventWaveForm.length / AudioPlayerWidget.wavesCount).round();
-    while (eventWaveForm.length > AudioPlayerWidget.wavesCount) {
-      eventWaveForm.removeAt(i);
-      i = (i + step) % AudioPlayerWidget.wavesCount;
-    }
-    return eventWaveForm
-        .map((i) => i > _maxWaveForm ? _maxWaveForm : i)
-        .toList();
-  }
-
-  int _maxWaveForm = 1024;
-
-  @override
-  void initState() {
-    super.initState();
-    matrix = Matrix.of(context);
-    _waveform = _getWaveform();
-
-    if (matrix.voiceMessageEventId.value == widget.event.eventId &&
-        matrix.audioPlayer != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ScaffoldMessenger.of(matrix.context).clearMaterialBanners();
-      });
-    }
-
-    final durationInt = widget.event.content
+  int? _durationSeconds(AudioPlayer? audioPlayer) {
+    final durationMs = widget.event.content
         .tryGetMap<String, Object?>('info')
         ?.tryGet<int>('duration');
-    if (durationInt != null) {
-      final duration = Duration(milliseconds: durationInt);
-      _durationString = duration.minuteSecondString;
-    }
+    if (durationMs != null) return (durationMs / 1000).round();
+    return audioPlayer?.duration?.inSeconds;
+  }
+
+  /// 播放中让喇叭图标轻微跳动。
+  ///
+  /// 放到帧后执行，避免在 build 期间通知动画监听者（否则会触发
+  /// “setState during build”）。
+  void _syncPulse(bool playing) {
+    if (playing == _pulseWanted) return;
+    _pulseWanted = playing;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_pulseWanted) {
+        if (!_pulseController.isAnimating) {
+          _pulseController.repeat(reverse: true);
+        }
+      } else {
+        _pulseController.stop();
+        _pulseController.value = 0;
+      }
+    });
+  }
+
+  /// 微信的语音气泡宽度随时长变化：1 秒约 80px，60 秒约 200px。
+  double _bubbleWidth(int seconds) {
+    final s = seconds.clamp(1, 60);
+    return _minBubbleWidth + (s / 60.0) * (_maxBubbleWidth - _minBubbleWidth);
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final waveform = _waveform;
+    final fileDescription = widget.event.fileDescription;
 
     return ValueListenableBuilder(
       valueListenable: matrix.voiceMessageEventId,
@@ -314,224 +286,102 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
         final audioPlayer = eventId != widget.event.eventId
             ? null
             : matrix.audioPlayer;
+        final playing =
+            audioPlayer != null &&
+            audioPlayer.playing &&
+            !audioPlayer.isAtEndPosition;
+        final isOwn = widget.event.senderId == widget.event.room.client.userID;
 
-        final fileDescription = widget.event.fileDescription;
+        _syncPulse(playing);
 
-        return StreamBuilder<Object>(
-          stream: audioPlayer == null
-              ? null
-              : StreamGroup.merge([
-                  audioPlayer.positionStream.asBroadcastStream(),
-                  audioPlayer.playerStateStream.asBroadcastStream(),
-                ]),
-          builder: (context, _) {
-            final maxPosition =
-                audioPlayer?.duration?.inMilliseconds.toDouble() ?? 1.0;
-            var currentPosition =
-                audioPlayer?.position.inMilliseconds.toDouble() ?? 0.0;
-            if (currentPosition > maxPosition) currentPosition = maxPosition;
+        final seconds = _durationSeconds(audioPlayer) ?? 5;
+        final width = _bubbleWidth(seconds);
 
-            final wavePosition =
-                (currentPosition / maxPosition) * AudioPlayerWidget.wavesCount;
-
-            final statusText = audioPlayer == null
-                ? _durationString ?? '00:00'
-                : audioPlayer.position.minuteSecondString;
-            return Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                mainAxisSize: .min,
-                crossAxisAlignment: .start,
-                children: [
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: FluffyThemes.columnWidth,
-                    ),
-                    child: Row(
-                      mainAxisSize: .min,
-                      children: <Widget>[
-                        SizedBox(
-                          width: buttonSize,
-                          height: buttonSize,
-                          child: status == AudioPlayerStatus.downloading
-                              ? CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: widget.color,
-                                  value: _downloadProgress,
-                                )
-                              : InkWell(
-                                  borderRadius: BorderRadius.circular(64),
-                                  onLongPress: () =>
-                                      widget.event.saveFile(context),
-                                  onTap: _onButtonTap,
-                                  child: Material(
-                                    color: widget.color.withAlpha(64),
-                                    borderRadius: BorderRadius.circular(64),
-                                    child: Icon(
-                                      audioPlayer?.playing == true &&
-                                              audioPlayer?.isAtEndPosition ==
-                                                  false
-                                          ? Icons.pause_outlined
-                                          : Icons.play_arrow_outlined,
-                                      color: widget.color,
-                                    ),
-                                  ),
-                                ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Stack(
-                            children: [
-                              if (waveform != null)
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16.0,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      for (
-                                        var i = 0;
-                                        i < AudioPlayerWidget.wavesCount;
-                                        i++
-                                      )
-                                        Expanded(
-                                          child: Container(
-                                            height: 32,
-                                            alignment: Alignment.center,
-                                            child: Container(
-                                              margin:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 1,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: i < wavePosition
-                                                    ? widget.color
-                                                    : widget.color.withAlpha(
-                                                        128,
-                                                      ),
-                                                borderRadius:
-                                                    BorderRadius.circular(64),
-                                              ),
-                                              height:
-                                                  32 *
-                                                  (waveform[i] / _maxWaveForm),
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              SizedBox(
-                                height: 32,
-                                child: Slider(
-                                  thumbColor:
-                                      widget.event.senderId ==
-                                          widget.event.room.client.userID
-                                      ? theme.colorScheme.onPrimary
-                                      : theme.colorScheme.primary,
-                                  activeColor: waveform == null
-                                      ? widget.color
-                                      : Colors.transparent,
-                                  inactiveColor: waveform == null
-                                      ? widget.color.withAlpha(128)
-                                      : Colors.transparent,
-                                  max: maxPosition,
-                                  value: currentPosition,
-                                  onChanged: (position) => audioPlayer == null
-                                      ? _onButtonTap()
-                                      : audioPlayer.seek(
-                                          Duration(
-                                            milliseconds: position.round(),
-                                          ),
-                                        ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          width: 36,
-                          child: Text(
-                            statusText,
-                            style: TextStyle(color: widget.color, fontSize: 12),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        AnimatedCrossFade(
-                          firstChild: Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: Icon(
-                              Icons.mic_none_outlined,
-                              color: widget.color,
-                            ),
-                          ),
-                          secondChild: Material(
-                            color: widget.color.withAlpha(64),
-                            borderRadius: BorderRadius.circular(
-                              AppConfig.borderRadius,
-                            ),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(
-                                AppConfig.borderRadius,
-                              ),
-                              onTap: _toggleSpeed,
-                              child: SizedBox(
-                                width: 32,
-                                height: 20,
-                                child: Center(
-                                  child: Text(
-                                    '${audioPlayer?.speed}x',
-                                    style: TextStyle(
-                                      color: widget.color,
-                                      fontSize: 9,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          alignment: Alignment.center,
-                          crossFadeState: audioPlayer == null
-                              ? CrossFadeState.showFirst
-                              : CrossFadeState.showSecond,
-                          duration: FluffyThemes.animationDuration,
-                        ),
-                      ],
-                    ),
+        final icon = status == AudioPlayerStatus.downloading
+            ? SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: widget.color,
+                  value: _downloadProgress,
+                ),
+              )
+            : ScaleTransition(
+                scale: Tween<double>(begin: 1, end: 1.18).animate(
+                  CurvedAnimation(
+                    parent: _pulseController,
+                    curve: Curves.easeInOut,
                   ),
-                  if (fileDescription != null) ...[
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      child: Linkify(
-                        text: fileDescription,
-                        textScaleFactor: MediaQuery.textScalerOf(
-                          context,
-                        ).scale(1),
-                        style: TextStyle(
-                          color: widget.color,
-                          fontSize: widget.fontSize,
-                        ),
-                        options: const LinkifyOptions(humanize: false),
-                        linkStyle: TextStyle(
-                          color: widget.linkColor,
-                          fontSize: widget.fontSize,
-                          decoration: TextDecoration.underline,
-                          decorationColor: widget.linkColor,
-                        ),
-                        onOpen: (url) =>
-                            UrlLauncher(context, url.url).launchUrl(),
-                      ),
-                    ),
-                  ],
-                ],
+                ),
+                child: Icon(
+                  playing ? Icons.graphic_eq : Icons.volume_up,
+                  size: 18,
+                  color: widget.color,
+                ),
+              );
+
+        final durationLabel = Text(
+          '$seconds"',
+          style: TextStyle(
+            color: widget.color,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        );
+
+        return Column(
+          mainAxisSize: .min,
+          crossAxisAlignment: .start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(4),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _onButtonTap,
+                child: Container(
+                  width: width,
+                  height: _bubbleHeight,
+                  alignment: isOwn
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    mainAxisSize: .min,
+                    mainAxisAlignment: isOwn
+                        ? MainAxisAlignment.end
+                        : MainAxisAlignment.start,
+                    children: isOwn
+                        ? [durationLabel, const SizedBox(width: 6), icon]
+                        : [icon, const SizedBox(width: 6), durationLabel],
+                  ),
+                ),
               ),
-            );
-          },
+            ),
+            if (fileDescription != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Linkify(
+                  text: fileDescription,
+                  textScaleFactor: MediaQuery.textScalerOf(context).scale(1),
+                  style: TextStyle(
+                    color: widget.color,
+                    fontSize: widget.fontSize,
+                  ),
+                  options: const LinkifyOptions(humanize: false),
+                  linkStyle: TextStyle(
+                    color: widget.linkColor,
+                    fontSize: widget.fontSize,
+                    decoration: TextDecoration.underline,
+                    decorationColor: widget.linkColor,
+                  ),
+                  onOpen: (url) => UrlLauncher(context, url.url).launchUrl(),
+                ),
+              ),
+          ],
         );
       },
     );

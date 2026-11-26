@@ -3002,5 +3002,11 @@
                 "type": "String"
             }
         }
-    }
+    },
+  "audioFavorite": "收藏",
+  "audioFavorited": "已收藏",
+  "audioFavoriteRemoved": "已取消收藏",
+  "audioQuote": "引用",
+  "audioMultiSelect": "多选",
+  "redactConfirm": "撤回这条消息？"
 }
