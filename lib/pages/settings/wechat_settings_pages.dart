@@ -7,6 +7,7 @@ import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/app_settings_launcher.dart';
 import 'package:fluffychat/utils/notifications/app_notifications.dart';
+import 'package:fluffychat/utils/notifications/notification_log.dart';
 import 'package:fluffychat/utils/updates/app_update_service.dart';
 import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
@@ -186,7 +187,103 @@ class _SettingsNotificationsPageState extends State<SettingsNotificationsPage> {
               : const Icon(Icons.chevron_right),
           onTap: _sendingTest ? null : _sendTestNotification,
         ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Divider(color: theme.colorScheme.outlineVariant),
+        ),
+        const _NotificationDiagnosticsTile(),
       ],
+    );
+  }
+}
+
+/// 「通知诊断」：把最近 60 条 [NotificationLog] 显示出来。
+///
+/// 没有 adb 的时候，复现一次消息、然后截图这里，就能看出通知是卡在
+/// 「不在前台 / 自己发的 / 被推送规则过滤 / show() 失败」哪一步。
+class _NotificationDiagnosticsTile extends StatelessWidget {
+  const _NotificationDiagnosticsTile();
+
+  Future<void> _copy(BuildContext context) async {
+    final l10n = L10n.of(context);
+    final entries = NotificationLog.entries;
+    await Clipboard.setData(
+      ClipboardData(
+        text: entries.isEmpty
+            ? l10n.notificationDiagnosticsEmpty
+            : entries.join('\n'),
+      ),
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(l10n.copy)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
+    final theme = Theme.of(context);
+    return ValueListenableBuilder<int>(
+      valueListenable: NotificationLog.revision,
+      builder: (context, _, _) {
+        final entries = NotificationLog.entries;
+        return ExpansionTile(
+          leading: const Icon(Icons.bug_report_outlined),
+          title: Text(l10n.notificationDiagnostics),
+          subtitle: Text(
+            entries.isEmpty
+                ? l10n.notificationDiagnosticsHint
+                : '${entries.length}',
+          ),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          expandedCrossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.notificationDiagnosticsHint,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: entries.isEmpty
+                  ? Text(
+                      l10n.notificationDiagnosticsEmpty,
+                      style: theme.textTheme.bodySmall,
+                    )
+                  : SelectableText(
+                      entries.join('\n'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                        height: 1.35,
+                      ),
+                    ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: entries.isEmpty ? null : () => _copy(context),
+                  icon: const Icon(Icons.copy, size: 18),
+                  label: Text(l10n.copy),
+                ),
+                TextButton.icon(
+                  onPressed: entries.isEmpty ? null : NotificationLog.clear,
+                  icon: const Icon(Icons.clear_all, size: 18),
+                  label: Text(l10n.clear),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
     );
   }
 }

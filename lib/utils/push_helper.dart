@@ -18,6 +18,7 @@ import 'package:fluffychat/utils/matrix_live_kit_calls/matrix_live_kit_call.dart
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 import 'package:fluffychat/utils/notification_avatar_extension.dart';
 import 'package:fluffychat/utils/notification_background_handler.dart';
+import 'package:fluffychat/utils/notifications/notification_log.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/start_push_foreground_service.dart';
 import 'package:flutter/foundation.dart';
@@ -74,6 +75,7 @@ Future<void> pushHelper(
       ]);
     }
 
+    NotificationLog.add('pushHelper 异常，走兜底通知: $e');
     if (notification.roomId != null) {
       await flutterLocalNotificationsPlugin.show(
         id: notification.notificationId,
@@ -149,9 +151,9 @@ Future<void> _tryPushHelper(
   updateAppBadge(notification.counts?.unread ?? 0);
 
   if (event == null) {
-    Logs().i(
-      '[notif] pushHelper: event not found (clearing indicator) '
-      'room=${notification.roomId} event=${notification.eventId}',
+    NotificationLog.add(
+      'pushHelper: 找不到事件（可能是已读/查不到）'
+      ' room=${notification.roomId} event=${notification.eventId}',
     );
     if (client.syncPending) return;
     if (clients?.length == 1 && (notification.counts?.unread == 0)) {
@@ -177,9 +179,9 @@ Future<void> _tryPushHelper(
   Logs().v('Push helper got notification event of type ${event.type}.');
 
   if (!client.pushruleEvaluator.match(event).notify) {
-    Logs().i(
-      '[notif] pushHelper: filtered by push rules '
-      'room=${event.roomId} event=${event.eventId}',
+    NotificationLog.add(
+      'pushHelper: 被推送规则过滤（免打扰/静音）'
+      ' room=${event.roomId} event=${event.eventId}',
     );
     return;
   }
@@ -194,7 +196,7 @@ Future<void> _tryPushHelper(
   if (notification.roomId != null &&
       activeRoomId == notification.roomId &&
       WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-    Logs().i('[notif] pushHelper: room is in foreground, skip');
+    NotificationLog.add('pushHelper: 正在看这个房间，跳过');
     return;
   }
 
@@ -362,6 +364,7 @@ Future<void> _tryPushHelper(
       flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin,
     );
   }
+  NotificationLog.add('pushHelper 完成 room=${event.roomId}');
   Logs().v('Push helper has been completed!');
 }
 

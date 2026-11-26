@@ -24,6 +24,7 @@ import 'package:fluffychat/widgets/app_update_dialog.dart';
 import 'package:fluffychat/widgets/fluffy_chat_app.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
 import 'package:just_audio/just_audio.dart';
@@ -39,6 +40,7 @@ import '../pages/key_verification/key_verification_dialog.dart';
 import '../utils/account_bundles.dart';
 import '../utils/background_push.dart';
 import '../utils/notifications/app_notifications.dart';
+import '../utils/notifications/notification_log.dart';
 import 'local_notifications_extension.dart';
 
 class Matrix extends StatefulWidget {
@@ -230,6 +232,29 @@ class MatrixState extends State<Matrix> {
     initMatrix();
     _scheduleUpdateCheck();
     _startReminderTicker();
+    _startNotificationHeartbeat();
+  }
+
+  Timer? _heartbeatTimer;
+
+  /// 每 60 秒写一条心跳：`prev_batch`、前后台状态、前台服务是否在跑。
+  ///
+  /// 用来区分「后台 sync 被系统冻结」和「sync 正常但通知逻辑没过」这两种情况
+  /// —— 后台时心跳里的 prev_batch 还在变、fgs=true，就说明消息是能收到的。
+  void _startNotificationHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 60), (_) async {
+      if (!mounted) return;
+      var running = false;
+      try {
+        running = await FlutterForegroundTask.isRunningService;
+      } catch (_) {}
+      final c = getClientByName(client.clientName);
+      NotificationLog.add(
+        'heartbeat prev_batch=${c?.prevBatch != null} '
+        'lifecycle=${_lifecycleState?.name} fgs=$running',
+      );
+    });
   }
 
   Timer? _reminderTimer;
@@ -255,6 +280,22 @@ class MatrixState extends State<Matrix> {
         ),
       );
     });
+  }
+
+  DateTime? _lastSyncLogAt;
+
+  /// sync 只每 60 秒记一条：环形日志一共 60 条，全记会被冲掉。
+  void _logSync(SyncUpdate syncUpdate) {
+    final now = DateTime.now();
+    final last = _lastSyncLogAt;
+    if (last != null && now.difference(last) < const Duration(seconds: 60)) {
+      return;
+    }
+    _lastSyncLogAt = now;
+    NotificationLog.add(
+      'onSync join=${syncUpdate.rooms?.join?.length ?? 0} '
+      'leave=${syncUpdate.rooms?.leave?.length ?? 0}',
+    );
   }
 
   Timer? _updateCheckTimer;
@@ -367,12 +408,17 @@ class MatrixState extends State<Matrix> {
       // 所以后台收不到推送就永远不会有通知。这里改成：App 不在前台时，每次
       // sync 完自己给自己发一条本地通知，效果和推送通知一样（同一条渠道、
       // 同样的「消息样式」，点击也能回到对应会话）。
-      onNotification[name] ??= c.onSync.stream.listen((_) {
+      onNotification[name] ??= c.onSync.stream.listen((syncUpdate) {
+        _logSync(syncUpdate);
         unawaited(_showBackgroundNotifications(c));
       });
       // 直接盯「新消息事件」比等 sync 后扫房间更及时、也不依赖服务器下发的
       // 未读数：单聊群聊一视同仁，收到就弹。
       onTimelineEventSub[name] ??= c.onTimelineEvent.stream.listen((event) {
+        NotificationLog.add(
+          '新事件 room=${event.roomId} sender=${event.senderId} '
+          'type=${event.type} me=${c.userID}',
+        );
         unawaited(_notifyForEvent(c, event));
       });
     }
@@ -494,6 +540,7 @@ class MatrixState extends State<Matrix> {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final wasDetached = _lifecycleState == AppLifecycleState.detached;
     _lifecycleState = state;
+    NotificationLog.add('lifecycle=${state.name}');
     if (wasDetached) {
       backgroundPush?.openRoomFromNotification(newActivity: true);
     }
@@ -523,13 +570,19 @@ class MatrixState extends State<Matrix> {
   Future<void> _syncForegroundService(bool foreground) async {
     try {
       if (foreground) {
-        Logs().i('[fgs] app resumed, stop keep-alive service');
+        NotificationLog.add('[fgs] 回前台 → 停止常驻服务');
         await ForegroundServices.stopService('background_push');
       } else {
-        Logs().i('[fgs] app in background, start keep-alive service');
+        NotificationLog.add('[fgs] 进后台 → 启动常驻服务');
         await ForegroundServices.startService('background_push');
       }
+      var running = false;
+      try {
+        running = await FlutterForegroundTask.isRunningService;
+      } catch (_) {}
+      NotificationLog.add('[fgs] isRunningService=$running');
     } catch (e, s) {
+      NotificationLog.add('[fgs] 启动/停止失败: $e');
       // Android 12+ 从后台启动前台服务可能被系统拒绝，这里只是尽量争取，
       // 失败也不影响消息通知本身。
       Logs().w('[fgs] 前台服务切换失败', e, s);
@@ -547,12 +600,14 @@ class MatrixState extends State<Matrix> {
     final l10n = await L10n.delegate.load(PlatformDispatcher.instance.locale);
     if (!mounted) return;
 
+    var unreadRooms = 0;
     for (final room in client.rooms) {
       final lastEvent = room.lastEvent;
       if (lastEvent == null) continue;
       if (lastEvent.senderId == client.userID) continue;
       if (room.notificationCount <= 0) continue;
       if (room.membership != Membership.join) continue;
+      unreadRooms++;
       await _pushRoomNotification(
         client,
         room,
@@ -561,6 +616,9 @@ class MatrixState extends State<Matrix> {
         l10n: l10n,
       );
     }
+    NotificationLog.add(
+      'sync 扫描：共 ${client.rooms.length} 个会话，$unreadRooms 个带未读',
+    );
   }
 
   /// 收到一条新时间线事件时判断要不要弹通知。
@@ -568,17 +626,40 @@ class MatrixState extends State<Matrix> {
   /// 与 `_showBackgroundNotifications` 的区别：这条不看服务器下发的未读数，
   /// 只看「是不是别人发的新消息」+「App 在不在前台」，单聊群聊完全同一套逻辑。
   Future<void> _notifyForEvent(Client client, Event event) async {
-    if (!_mayNotify(client)) return;
-    if (event.senderId == client.userID) return;
+    if (!PlatformInfos.isMobile) {
+      NotificationLog.add('跳过：不是移动端');
+      return;
+    }
+    if (!client.isLogged()) {
+      NotificationLog.add('跳过：client 未登录');
+      return;
+    }
+    if (!WechatPrefs.notifyReceive) {
+      NotificationLog.add('跳过：设置里关掉了「接收新消息通知」');
+      return;
+    }
+    if (_lifecycleState == AppLifecycleState.resumed) {
+      NotificationLog.add('跳过：App 在前台（lifecycle=resumed）');
+      return;
+    }
+    if (event.senderId == client.userID) {
+      NotificationLog.add('跳过：自己发的');
+      return;
+    }
     final room = event.room;
-    if (room.membership != Membership.join) return;
+    if (room.membership != Membership.join) {
+      NotificationLog.add('跳过：不在该房间（${room.membership}）');
+      return;
+    }
     if (event.type != EventTypes.Message &&
         event.type != EventTypes.Encrypted &&
         event.type != EventTypes.Sticker) {
+      NotificationLog.add('跳过：不是消息事件（${event.type}）');
       return;
     }
     final l10n = await L10n.delegate.load(PlatformDispatcher.instance.locale);
     if (!mounted) return;
+    NotificationLog.add('→ 交给 pushHelper room=${room.id}');
     await _pushRoomNotification(
       client,
       room,
@@ -607,9 +688,12 @@ class MatrixState extends State<Matrix> {
     required L10n l10n,
   }) async {
     final key = '${client.clientName}|${room.id}';
-    if (_notifiedEventIds[key] == event.eventId) return;
+    if (_notifiedEventIds[key] == event.eventId) {
+      NotificationLog.add('跳过：这条事件已经弹过 ${event.eventId}');
+      return;
+    }
     _notifiedEventIds[key] = event.eventId;
-    Logs().i('[notif] room=${room.id} event=${event.eventId}');
+    NotificationLog.add('调用 show() room=${room.id} unread=$unread');
     try {
       await pushHelper(
         PushNotification(
@@ -629,8 +713,10 @@ class MatrixState extends State<Matrix> {
         // 否则常驻通知会跟着消失、进程也失去保护。
         stopForegroundService: false,
       );
-    } catch (e, s) {
-      Logs().w('[notif] 发送通知失败', e, s);
+      NotificationLog.add('show() 完成 room=${room.id}');
+    } catch (e) {
+      NotificationLog.add('show() 失败: $e');
+      Logs().w('[notif] 发送通知失败', e);
     }
   }
 
