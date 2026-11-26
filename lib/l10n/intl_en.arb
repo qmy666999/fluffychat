@@ -3008,5 +3008,17 @@
   "messageFavoriteRemoved": "Removed from favorites",
   "messageQuote": "Quote",
   "messageMultiSelect": "Select",
-  "redactConfirm": "Unsend this message?"
+  "redactConfirm": "Unsend this message?",
+  "serverEndpointLan": "Server: {host} (LAN · fast)",
+  "@serverEndpointLan": {
+    "placeholders": {"host": {"type": "String"}}
+  },
+  "serverEndpointWan": "Server: {host} (public)",
+  "@serverEndpointWan": {
+    "placeholders": {"host": {"type": "String"}}
+  },
+  "serverEndpointLanHint": "Using your home network — fastest for media",
+  "serverEndpointWanHint": "On the public route; restart the app on your home Wi-Fi to switch back",
+  "serverEndpointOffline": "Cannot reach the server right now — check your network",
+  "serverEndpointRecheck": "Check again"
 }

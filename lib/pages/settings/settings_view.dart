@@ -17,6 +17,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../widgets/mxc_image_viewer.dart';
+import 'server_endpoint_tile.dart';
 import 'settings.dart';
 
 class SettingsView extends StatelessWidget {
@@ -257,6 +258,8 @@ class SettingsView extends StatelessWidget {
               title: Text(L10n.of(context).about),
               onTap: () => PlatformInfos.showDialog(context),
             ),
+            // 当前走的是局域网还是公网，附带「重新检测」。
+            const ServerEndpointTile(),
             Divider(color: theme.dividerColor),
             ListTile(
               leading: const Icon(Icons.logout_outlined),

@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'package:fluffychat/config/server_endpoints.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:flutter/foundation.dart';
 import 'package:matrix/matrix.dart';
@@ -35,7 +36,11 @@ Future<void> registerNewAccount({
   required String password,
 }) async {
   // 必须先把 client 指向目标 homeserver，register 的 baseUri 由它决定。
-  await client.checkHomeserver(homeserver);
+  // 自己的服务器跳过 well-known（它永远把地址指回公网，在家就绕远了）。
+  await client.checkHomeserver(
+    homeserver,
+    checkWellKnown: !ServerEndpoints.isOwnHost(homeserver.host),
+  );
 
   final initialDeviceDisplayName = PlatformInfos.appDisplayName;
 
@@ -82,7 +87,8 @@ void _logSuccess(RegisterResponse response, String how) {
 String? _pickStage(List<AuthenticationFlow>? flows) {
   if (flows == null || flows.isEmpty) return null;
   for (final flow in flows) {
-    if (flow.stages.length == 1 && _supportedStages.contains(flow.stages.single)) {
+    if (flow.stages.length == 1 &&
+        _supportedStages.contains(flow.stages.single)) {
       return flow.stages.single;
     }
   }

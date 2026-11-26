@@ -23,8 +23,10 @@ import 'package:matrix/matrix.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_html/universal_html.dart' as web;
 
+import 'config/server_endpoints.dart';
 import 'config/setting_keys.dart';
 import 'utils/background_push.dart';
+import 'utils/server_probe.dart';
 import 'widgets/fluffy_chat_app.dart';
 
 ReceivePort? mainIsolateReceivePort;
@@ -34,6 +36,9 @@ bool _vodozemacInitialized = false;
 bool isIntegrationTest = false;
 
 void main(List<String> args) => runZonedGuarded(() async {
+  // 局域网入口是自签证书，只对私有网段放行，必须在任何 HttpClient 创建之前装上。
+  installPrivateCertOverride();
+
   // Forward Flutter errors to global error reporter
   FlutterError.onError = (details) => Zone.current.handleUncaughtError(
     details.exception,
@@ -63,6 +68,10 @@ void main(List<String> args) => runZonedGuarded(() async {
   // To make sure that the parts of flutter needed are started up already, we need to ensure that the
   // widget bindings are initialized already.
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 局域网优先：两个端点并行探测，各 2 秒封顶，最坏让启动慢 2 秒。
+  await pickFastestServer();
+  Logs().i('[ServerEndpoints] using ${ServerEndpoints.current}');
 
   final store = await AppSettings.init();
   Logs().i('Welcome to ${AppSettings.applicationName.value} <3');

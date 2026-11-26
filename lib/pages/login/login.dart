@@ -5,6 +5,7 @@
 
 import 'dart:async';
 
+import 'package:fluffychat/config/server_endpoints.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
@@ -115,6 +116,18 @@ class LoginController extends State<Login> {
     if (!userId.isValidMatrixIdStrict()) return;
     final oldHomeserver = widget.client.homeserver;
     try {
+      // 我们自己的服务器：直接按启动时探测到的入口连，跳过 well-known
+      //（它的 base_url 永远指公网，在家会白绕一大圈）。
+      if (userId.domain == ServerEndpoints.serverName) {
+        final endpoint = ServerEndpoints.uri;
+        widget.client.homeserver = endpoint;
+        if (endpoint != oldHomeserver) {
+          await widget.client.checkHomeserver(endpoint, checkWellKnown: false);
+        }
+        usernameError = null;
+        if (mounted) setState(() {});
+        return;
+      }
       var newDomain = Uri.https(userId.domain!, '');
       widget.client.homeserver = newDomain;
       DiscoveryInformation? wellKnownInformation;

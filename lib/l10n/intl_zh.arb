@@ -3008,5 +3008,17 @@
   "messageFavoriteRemoved": "已取消收藏",
   "messageQuote": "引用",
   "messageMultiSelect": "多选",
-  "redactConfirm": "撤回这条消息？"
+  "redactConfirm": "撤回这条消息？",
+  "serverEndpointLan": "服务器：{host}（局域网 · 快速）",
+  "@serverEndpointLan": {
+    "placeholders": {"host": {"type": "String"}}
+  },
+  "serverEndpointWan": "服务器：{host}（公网）",
+  "@serverEndpointWan": {
+    "placeholders": {"host": {"type": "String"}}
+  },
+  "serverEndpointLanHint": "正在走家里的局域网，发图发视频最快",
+  "serverEndpointWanHint": "当前在外网；回到家里的 Wi-Fi 后重启 App 会自动切回局域网",
+  "serverEndpointOffline": "现在连不上服务器，请检查网络",
+  "serverEndpointRecheck": "重新检测"
 }

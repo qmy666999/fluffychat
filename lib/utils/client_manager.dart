@@ -5,6 +5,7 @@
 
 import 'package:collection/collection.dart';
 import 'package:fluffychat/config/app_config.dart';
+import 'package:fluffychat/config/server_endpoints.dart';
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/custom_http_client.dart';
@@ -64,6 +65,11 @@ abstract class ClientManager {
               ),
         ),
       );
+    }
+    // 会话恢复时 homeserver 是从数据库里的旧地址还原的，这里按本次探测结果
+    // 把 base_url 换成局域网或公网（只动地址，server_name 不变）。
+    for (final client in clients) {
+      ServerEndpoints.applyTo(client);
     }
     if (clients.length > 1 && clients.any((c) => !c.isLogged())) {
       final loggedOutClients = clients.where((c) => !c.isLogged()).toList();

@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'package:fluffychat/config/server_endpoints.dart';
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/sign_in_flows/register_flow.dart';
@@ -49,8 +50,11 @@ class RegisterPageController extends State<RegisterPage> {
 
   String _defaultHomeserver() {
     final preset = AppSettings.presetHomeserver.value.trim();
-    if (preset.isNotEmpty) return preset;
-    return AppSettings.defaultHomeserver.value.trim();
+    final server = preset.isNotEmpty
+        ? preset
+        : AppSettings.defaultHomeserver.value.trim();
+    // 预设的是服务器域名，真正连哪个入口由启动时的探测决定（局域网优先）。
+    return ServerEndpoints.resolveAuthority(server);
   }
 
   void toggleShowPassword() =>
@@ -86,7 +90,8 @@ class RegisterPageController extends State<RegisterPage> {
     while (host.endsWith('/')) {
       host = host.substring(0, host.length - 1);
     }
-    return host;
+    // 只换入口地址；server_name 由服务器决定，不受影响。
+    return ServerEndpoints.resolveAuthority(host);
   }
 
   Future<void> register() async {
@@ -97,7 +102,9 @@ class RegisterPageController extends State<RegisterPage> {
 
     setState(() {
       usernameError = username.isEmpty ? l10n.pleaseEnterYourUsername : null;
-      passwordError = password.length < 8 ? l10n.registerPasswordTooShort : null;
+      passwordError = password.length < 8
+          ? l10n.registerPasswordTooShort
+          : null;
       confirmPasswordError = password != confirm
           ? l10n.passwordsDoNotMatch
           : null;
