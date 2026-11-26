@@ -4,6 +4,7 @@
 import 'dart:async';
 
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/voip/loading_dots.dart';
 import 'package:fluffychat/utils/voip/matrix_voip.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:flutter/material.dart';
@@ -11,92 +12,132 @@ import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 import 'package:matrix/matrix.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-/// 微信风格的全屏通话页。
+/// 微信风格的全屏通话页（拨打 / 来电 / 通话中 / 结束）。
 ///
-/// 语音通话显示头像 + 状态；视频通话把对方画面铺满，自己画面缩在右上角。
-/// 页面只读 [MatrixVoip.activeCall]，通话结束时延迟 1.5 秒再清空，避免闪一下。
+/// 硬性要求：不管数据是否正常，顶部栏和底部按钮区永远渲染，
+/// 挂断按钮永远可用（不依赖 `call != null`）。
 class VoipCallPage extends StatefulWidget {
-  final MatrixVoip voip;
+  /// 由 `/call` 路由打开时为空，自动使用当前通话的管理器。
+  final MatrixVoip? voip;
 
-  const VoipCallPage({super.key, required this.voip});
+  const VoipCallPage({super.key, this.voip});
 
   @override
   State<VoipCallPage> createState() => _VoipCallPageState();
 }
 
 class _VoipCallPageState extends State<VoipCallPage> {
+  MatrixVoip? _voip;
+
   final rtc.RTCVideoRenderer _remoteRenderer = rtc.RTCVideoRenderer();
   final rtc.RTCVideoRenderer _localRenderer = rtc.RTCVideoRenderer();
+  bool _renderersReady = false;
 
-  Timer? _durationTimer;
+  Timer? _ticker;
   Timer? _endTimer;
   DateTime? _connectedAt;
   rtc.MediaStream? _remoteStream;
   rtc.MediaStream? _localStream;
 
+  /// 自己按的挂断/拒绝：用来区分「对方已拒绝」和「通话结束」。
+  bool _endedLocally = false;
+  bool _closing = false;
+
+  CallSession? get _call => _voip?.activeCall.value;
+
   @override
   void initState() {
     super.initState();
-    _remoteRenderer.initialize();
-    _localRenderer.initialize();
-    widget.voip.revision.addListener(_onRevision);
-    _onRevision();
+    final session = MatrixVoip.activeSession.value;
+    _voip =
+        widget.voip ??
+        MatrixVoip.activeVoip ??
+        (session == null
+            ? null
+            : MatrixVoip.of(session.room.client) ??
+                  MatrixVoip.ensure(session.room.client));
+    MatrixVoip.activeSession.addListener(_onChanged);
+    _voip?.revision.addListener(_onChanged);
+    unawaited(_prepareRenderers());
     WakelockPlus.enable();
+    _onChanged();
+  }
+
+  Future<void> _prepareRenderers() async {
+    try {
+      await _remoteRenderer.initialize();
+      await _localRenderer.initialize();
+      if (!mounted) return;
+      _renderersReady = true;
+      _syncStreams();
+      setState(() {});
+    } catch (e) {
+      // 某些平台没有 WebRTC，通话照样可以挂断，不能因为初始化失败白屏。
+      Logs().w('[VoIP] 视频渲染器初始化失败', e);
+    }
   }
 
   @override
   void dispose() {
-    widget.voip.revision.removeListener(_onRevision);
-    _durationTimer?.cancel();
+    MatrixVoip.pageOpen = false;
+    MatrixVoip.activeSession.removeListener(_onChanged);
+    _voip?.revision.removeListener(_onChanged);
+    _ticker?.cancel();
     _endTimer?.cancel();
-    if (_connectedAt != null) WakelockPlus.disable();
-    _remoteRenderer.dispose();
-    _localRenderer.dispose();
+    WakelockPlus.disable();
+    if (_renderersReady) {
+      _remoteRenderer.dispose();
+      _localRenderer.dispose();
+    }
     super.dispose();
   }
 
-  void _onRevision() {
-    final call = widget.voip.activeCall.value;
-    if (call == null) return;
+  void _onChanged() {
+    if (!mounted) return;
+    final call = _call;
+    _syncStreams();
 
-    final remote = call.remoteUserMediaStream?.stream;
-    if (remote != _remoteStream) {
-      _remoteStream = remote;
-      _remoteRenderer.srcObject = remote;
-    }
-    final local = call.localUserMediaStream?.stream;
-    if (local != _localStream) {
-      _localStream = local;
-      _localRenderer.srcObject = local;
-    }
-
-    if (call.state == CallState.kConnected && _connectedAt == null) {
+    if (call?.state == CallState.kConnected && _connectedAt == null) {
       _connectedAt = DateTime.now();
-      _durationTimer = Timer.periodic(
+      _ticker?.cancel();
+      _ticker = Timer.periodic(
         const Duration(seconds: 1),
         (_) => setState(() {}),
       );
     }
 
-    if (call.state == CallState.kEnded && _endTimer == null) {
-      _endTimer = Timer(const Duration(milliseconds: 1500), () {
-        widget.voip.clear();
-      });
+    if (call != null && call.state == CallState.kEnded) {
+      _ticker?.cancel();
+      _endTimer ??= Timer(const Duration(milliseconds: 1500), _finish);
     }
 
-    if (mounted) setState(() {});
+    setState(() {});
+  }
+
+  void _syncStreams() {
+    if (!_renderersReady) return;
+    final call = _call;
+    final remote = call?.remoteUserMediaStream?.stream;
+    if (remote != _remoteStream) {
+      _remoteStream = remote;
+      _remoteRenderer.srcObject = remote;
+    }
+    final local = call?.localUserMediaStream?.stream;
+    if (local != _localStream) {
+      _localStream = local;
+      _localRenderer.srcObject = local;
+    }
   }
 
   String _durationString() {
     final connectedAt = _connectedAt;
-    if (connectedAt == null) return '';
+    if (connectedAt == null) return '00:00';
     final seconds = DateTime.now().difference(connectedAt).inSeconds;
     final minutes = (seconds ~/ 60).toString().padLeft(2, '0');
-    final rest = (seconds % 60).toString().padLeft(2, '0');
-    return '$minutes:$rest';
+    return '$minutes:${(seconds % 60).toString().padLeft(2, '0')}';
   }
 
-  /// 1 对 1 房间里就是对方；群组房间这一版不发起通话，兜底返回 null。
+  /// 1 对 1 房间里就是对方。
   User? _peerOf(Room room) {
     final peerId = room.directChatMatrixID;
     if (peerId == null) return null;
@@ -106,8 +147,27 @@ class _VoipCallPageState extends State<VoipCallPage> {
     return null;
   }
 
-  String _statusText(BuildContext context, CallSession call, L10n l10n) {
-    final isVideo = call.type == CallType.kVideo;
+  String _peerName(CallSession? call) {
+    final room = call?.room;
+    if (room == null) return '';
+    final peer = _peerOf(room);
+    return peer?.calcDisplayname() ?? room.getLocalizedDisplayname();
+  }
+
+  bool _isIncoming(CallSession? call) =>
+      call != null &&
+      !call.isOutgoing &&
+      !call.answeredByUs &&
+      call.state != CallState.kEnded;
+
+  bool _isWaiting(CallSession? call) =>
+      call != null &&
+      call.state != CallState.kEnded &&
+      call.state != CallState.kConnected &&
+      call.state != CallState.kRinging;
+
+  String _statusText(L10n l10n, CallSession? call) {
+    if (call == null) return l10n.callConnecting;
     switch (call.state) {
       case CallState.kEnded:
         switch (call.hangupReason) {
@@ -116,6 +176,9 @@ class _VoipCallPageState extends State<VoipCallPage> {
           case CallErrorCode.userBusy:
             return l10n.callBusy;
           case CallErrorCode.userHangup:
+            if (call.isOutgoing && !call.answeredByUs && !_endedLocally) {
+              return l10n.callRejected;
+            }
             return l10n.callEnded;
           default:
             return call.hangupReason == null ? l10n.callEnded : l10n.callFailed;
@@ -123,46 +186,110 @@ class _VoipCallPageState extends State<VoipCallPage> {
       case CallState.kConnected:
         return _durationString();
       default:
-        if (!call.isOutgoing && !call.answeredByUs) {
-          return isVideo ? l10n.callIncomingVideo : l10n.callIncomingVoice;
+        if (_isIncoming(call)) {
+          final name = _peerName(call);
+          return call.type == CallType.kVideo
+              ? l10n.callInviteVideo(name)
+              : l10n.callInviteVoice(name);
         }
         if (call.isOutgoing) return l10n.callWaiting;
         return l10n.callConnecting;
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // 操作
+  // ---------------------------------------------------------------------------
+
+  Future<void> _hangup() async {
+    if (_closing) return;
+    _closing = true;
+    _endedLocally = true;
+    final voip = _voip ?? MatrixVoip.activeVoip;
+    try {
+      await voip?.hangup();
+    } catch (e) {
+      Logs().w('[VoIP] 挂断失败', e);
+    }
+    await _finish();
+  }
+
+  Future<void> _reject() async {
+    if (_closing) return;
+    _closing = true;
+    _endedLocally = true;
+    final voip = _voip ?? MatrixVoip.activeVoip;
+    try {
+      await voip?.reject();
+    } catch (e) {
+      Logs().w('[VoIP] 拒绝来电失败', e);
+    }
+    await _finish();
+  }
+
+  Future<void> _answer() async {
+    final voip = _voip ?? MatrixVoip.activeVoip;
+    try {
+      await voip?.answer();
+    } catch (e) {
+      Logs().w('[VoIP] 接听失败', e);
+    }
+  }
+
+  Future<void> _finish() async {
+    if (!mounted) return;
+    _endTimer?.cancel();
+    _endTimer = null;
+    _ticker?.cancel();
+    final voip = _voip ?? MatrixVoip.activeVoip;
+    Logs().i('[VoIP] 通话结束，释放资源');
+    try {
+      await voip?.clear();
+    } catch (e) {
+      Logs().w('[VoIP] 释放资源失败', e);
+    }
+    MatrixVoip.pageOpen = false;
+    if (!mounted) return;
+    Navigator.of(context).maybePop();
+  }
+
+  void _minimize() {
+    MatrixVoip.pageOpen = false;
+    Navigator.of(context).maybePop();
+  }
+
+  void _showVideoUnsupported() {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(L10n.of(context).callVideoSwitchUnavailable)),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 界面
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
-    final call = widget.voip.activeCall.value;
-    if (call == null) return const SizedBox.shrink();
-
     final theme = Theme.of(context);
     final l10n = L10n.of(context);
-    // 通话页统一用深色，但仍然从当前主题的种子色派生，避免写死颜色。
+    final voip = _voip ?? MatrixVoip.activeVoip;
+    final call = voip?.activeCall.value;
+    final isVideo = call?.type == CallType.kVideo;
+    final connected = call?.state == CallState.kConnected;
+
+    // 页面统一深色，但颜色仍从主题派生，不写死。
     final scheme = ColorScheme.fromSeed(
       seedColor: theme.colorScheme.primary,
       brightness: Brightness.dark,
     );
 
-    final isVideo = call.type == CallType.kVideo;
-    final room = call.room;
-    final peer = _peerOf(room);
-    final name = peer?.calcDisplayname() ?? room.getLocalizedDisplayname();
-    final incoming =
-        !call.isOutgoing &&
-        !call.answeredByUs &&
-        call.state != CallState.kEnded;
-
     return Theme(
-      data: theme.copyWith(
-        colorScheme: scheme,
-        scaffoldBackgroundColor: scheme.surfaceContainerLowest,
-      ),
+      data: theme.copyWith(colorScheme: scheme),
       child: Scaffold(
         backgroundColor: scheme.surfaceContainerLowest,
         body: Stack(
           children: [
-            if (isVideo && _remoteStream != null)
+            if (isVideo && connected && _remoteStream != null)
               Positioned.fill(
                 child: rtc.RTCVideoView(
                   _remoteRenderer,
@@ -170,64 +297,43 @@ class _VoipCallPageState extends State<VoipCallPage> {
                       rtc.RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                   mirror: false,
                 ),
+              )
+            else
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        scheme.surfaceContainerHigh,
+                        scheme.surfaceContainerLowest,
+                      ],
+                    ),
+                  ),
+                ),
               ),
             SafeArea(
               child: Column(
                 children: [
-                  const Spacer(),
-                  if (!isVideo)
-                    Avatar(
-                      mxContent: peer?.avatarUrl,
-                      name: name,
-                      client: room.client,
-                      size: 128,
-                    ),
-                  const SizedBox(height: 24),
+                  // 1. 顶部栏：永远渲染。
+                  _buildTopBar(scheme, l10n),
+                  // 2. 中间内容：可能为空，出问题也只影响这一块。
+                  Expanded(child: _buildMiddle(scheme, l10n, call, isVideo)),
+                  // 3. 底部按钮：永远渲染，且不依赖 call != null。
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(
-                      name,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        color: scheme.onSurface,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                    padding: const EdgeInsets.only(top: 16, bottom: 32),
+                    child: _buildButtons(scheme, l10n, voip, call, isVideo),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _statusText(context, call, l10n),
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (incoming)
-                    _IncomingControls(
-                      scheme: scheme,
-                      l10n: l10n,
-                      onDecline: widget.voip.reject,
-                      onAnswer: widget.voip.answer,
-                    )
-                  else
-                    _CallControls(
-                      scheme: scheme,
-                      l10n: l10n,
-                      voip: widget.voip,
-                      call: call,
-                      isVideo: isVideo,
-                    ),
-                  const SizedBox(height: 48),
                 ],
               ),
             ),
-            if (isVideo && _localStream != null)
+            if (isVideo && connected && _localStream != null)
               Positioned(
                 right: 16,
                 top: MediaQuery.paddingOf(context).top + 16,
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                   child: SizedBox(
                     width: 96,
                     height: 136,
@@ -245,156 +351,254 @@ class _VoipCallPageState extends State<VoipCallPage> {
       ),
     );
   }
-}
 
-class _IncomingControls extends StatelessWidget {
-  final ColorScheme scheme;
-  final L10n l10n;
-  final Future<void> Function() onDecline;
-  final Future<void> Function() onAnswer;
-
-  const _IncomingControls({
-    required this.scheme,
-    required this.l10n,
-    required this.onDecline,
-    required this.onAnswer,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _CallButton(
-          icon: Icons.call_end_rounded,
-          label: l10n.callDecline,
-          background: scheme.error,
-          foreground: scheme.onError,
-          onTap: onDecline,
-        ),
-        _CallButton(
-          icon: Icons.call_rounded,
-          label: l10n.callAnswer,
-          background: scheme.primary,
-          foreground: scheme.onPrimary,
-          onTap: onAnswer,
-        ),
-      ],
+  Widget _buildTopBar(ColorScheme scheme, L10n l10n) {
+    return SizedBox(
+      height: 56,
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: l10n.callMinimize,
+            onPressed: _minimize,
+            icon: Icon(
+              Icons.picture_in_picture_alt_outlined,
+              color: scheme.onSurface,
+            ),
+          ),
+        ],
+      ),
     );
   }
-}
 
-class _CallControls extends StatelessWidget {
-  final ColorScheme scheme;
-  final L10n l10n;
-  final MatrixVoip voip;
-  final CallSession call;
-  final bool isVideo;
-
-  const _CallControls({
-    required this.scheme,
-    required this.l10n,
-    required this.voip,
-    required this.call,
-    required this.isVideo,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final muted = call.isMicrophoneMuted;
-    final cameraOff = call.isLocalVideoMuted;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _CallButton(
-          icon: muted ? Icons.mic_off_rounded : Icons.mic_rounded,
-          label: muted ? l10n.callUnmute : l10n.callMute,
-          background: muted ? scheme.onSurface : scheme.surfaceContainerHighest,
-          foreground: muted ? scheme.surface : scheme.onSurface,
-          onTap: voip.toggleMute,
+  Widget _buildMiddle(
+    ColorScheme scheme,
+    L10n l10n,
+    CallSession? call,
+    bool isVideo,
+  ) {
+    if (call == null) {
+      return Center(
+        child: CircularProgressIndicator.adaptive(
+          valueColor: AlwaysStoppedAnimation(scheme.onSurfaceVariant),
         ),
-        if (isVideo)
-          _CallButton(
-            icon: cameraOff
-                ? Icons.videocam_off_rounded
-                : Icons.videocam_rounded,
-            label: cameraOff ? l10n.callCameraOn : l10n.callCameraOff,
-            background: cameraOff
-                ? scheme.onSurface
-                : scheme.surfaceContainerHighest,
-            foreground: cameraOff ? scheme.surface : scheme.onSurface,
-            onTap: voip.toggleVideo,
-          ),
-        if (isVideo)
-          _CallButton(
-            icon: Icons.cameraswitch_rounded,
-            label: l10n.callSwitchCamera,
-            background: scheme.surfaceContainerHighest,
-            foreground: scheme.onSurface,
-            onTap: voip.switchCamera,
-          ),
-        _CallButton(
-          icon: voip.speakerOn
-              ? Icons.volume_up_rounded
-              : Icons.volume_down_rounded,
-          label: voip.speakerOn ? l10n.callSpeakerOff : l10n.callSpeaker,
-          background: voip.speakerOn
-              ? scheme.onSurface
-              : scheme.surfaceContainerHighest,
-          foreground: voip.speakerOn ? scheme.surface : scheme.onSurface,
-          onTap: voip.toggleSpeaker,
-        ),
-        _CallButton(
-          icon: Icons.call_end_rounded,
-          label: l10n.callHangup,
-          background: scheme.error,
-          foreground: scheme.onError,
-          onTap: voip.hangup,
-        ),
-      ],
-    );
-  }
-}
+      );
+    }
 
-class _CallButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color background;
-  final Color foreground;
-  final Future<void> Function() onTap;
+    final connected = call.state == CallState.kConnected;
+    final name = _peerName(call);
+    final ended = call.state == CallState.kEnded;
+    final peer = _peerOf(call.room);
+    final waiting = _isWaiting(call) || _isIncoming(call);
 
-  const _CallButton({
-    required this.icon,
-    required this.label,
-    required this.background,
-    required this.foreground,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Material(
-          color: background,
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onTap,
-            child: SizedBox(
-              width: 64,
-              height: 64,
-              child: Icon(icon, color: foreground, size: 28),
+        if (!isVideo || !connected)
+          Avatar(
+            mxContent: peer?.avatarUrl,
+            name: name,
+            client: call.room.client,
+            size: 120,
+          ),
+        if (!isVideo || !connected) const SizedBox(height: 24),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            name,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w500,
+              color: scheme.onSurface,
             ),
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.labelMedium?.copyWith(color: foreground),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            _statusText(l10n, call),
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 15, color: scheme.onSurfaceVariant),
+          ),
+        ),
+        if (waiting && !ended) ...[
+          const SizedBox(height: 16),
+          LoadingDots(color: scheme.onSurfaceVariant),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildButtons(
+    ColorScheme scheme,
+    L10n l10n,
+    MatrixVoip? voip,
+    CallSession? call,
+    bool isVideo,
+  ) {
+    final incoming = _isIncoming(call);
+    final connected = call?.state == CallState.kConnected;
+    final ended = call?.state == CallState.kEnded;
+    final muted = call?.isMicrophoneMuted ?? false;
+    final speaker = voip?.speakerOn ?? false;
+    final cameraMuted = call?.isLocalVideoMuted ?? false;
+
+    if (incoming) {
+      return _actionRow(scheme, [
+        _CallAction(
+          icon: Icons.call_end,
+          label: l10n.callDecline,
+          destructive: true,
+          onTap: _reject,
+        ),
+        _CallAction(
+          icon: Icons.call,
+          label: l10n.callAnswer,
+          affirmative: true,
+          onTap: _answer,
+        ),
+      ], size: 72);
+    }
+
+    final actions = <_CallAction>[
+      _CallAction(
+        icon: muted ? Icons.mic_off : Icons.mic,
+        label: muted ? l10n.callMicOff : l10n.callMicOn,
+        onTap: () => voip?.toggleMute(),
+      ),
+      _CallAction(
+        icon: Icons.call_end,
+        label: connected ? l10n.callHangup : l10n.callCancel,
+        destructive: true,
+        onTap: _hangup,
+      ),
+      _CallAction(
+        icon: speaker ? Icons.volume_up : Icons.volume_off,
+        label: speaker ? l10n.callSpeakerOn : l10n.callSpeakerOff,
+        onTap: () => voip?.toggleSpeaker(),
+      ),
+      if (connected && !isVideo)
+        _CallAction(
+          icon: Icons.videocam_outlined,
+          label: l10n.callSwitchVideo,
+          onTap: _showVideoUnsupported,
+        ),
+      if (connected && isVideo) ...[
+        _CallAction(
+          icon: cameraMuted ? Icons.videocam_off : Icons.videocam,
+          label: cameraMuted ? l10n.callCameraOff : l10n.callCameraOn,
+          onTap: () => voip?.toggleVideo(),
+        ),
+        _CallAction(
+          icon: Icons.cameraswitch_outlined,
+          label: l10n.callSwitchCamera,
+          onTap: () => voip?.switchCamera(),
+        ),
+      ],
+    ];
+
+    if (ended && !_endedLocally) {
+      // 对方挂断/无人接听：只留一个挂断按钮，避免用户卡住。
+      return _actionRow(scheme, [
+        _CallAction(
+          icon: Icons.call_end,
+          label: l10n.callHangup,
+          destructive: true,
+          onTap: _hangup,
+        ),
+      ], size: 64);
+    }
+
+    return _actionRow(scheme, actions, size: 64);
+  }
+
+  Widget _actionRow(
+    ColorScheme scheme,
+    List<_CallAction> actions, {
+    required double size,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final action in actions)
+          Expanded(
+            child: _ActionButton(action: action, scheme: scheme, size: size),
+          ),
+      ],
+    );
+  }
+}
+
+class _CallAction {
+  const _CallAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.destructive = false,
+    this.affirmative = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool destructive;
+  final bool affirmative;
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.action,
+    required this.scheme,
+    required this.size,
+  });
+
+  final _CallAction action;
+  final ColorScheme scheme;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final background = action.destructive
+        ? scheme.error
+        : action.affirmative
+        ? scheme.primary
+        : scheme.surfaceContainerHigh;
+    final foreground = action.destructive
+        ? scheme.onError
+        : action.affirmative
+        ? scheme.onPrimary
+        : scheme.onSurface;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: size,
+          height: size,
+          child: Material(
+            color: background,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: action.onTap ?? () {},
+              child: Icon(action.icon, size: size * 0.42, color: foreground),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            action.label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, color: scheme.onSurface),
+          ),
         ),
       ],
     );

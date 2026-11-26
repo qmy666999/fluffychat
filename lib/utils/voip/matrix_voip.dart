@@ -3,6 +3,7 @@
 
 import 'dart:async';
 
+import 'package:fluffychat/widgets/fluffy_chat_app.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 import 'package:just_audio/just_audio.dart';
@@ -27,23 +28,47 @@ class MatrixVoip extends VoIP {
     delegate.voip = this;
   }
 
-  static final Map<String, MatrixVoip> _instances = {};
+  /// 按 `Client` 实例缓存（多账号时同一个 clientName 也只会有一个实例）。
+  static final Map<Client, MatrixVoip> _instances = {};
 
-  /// 用 `client.clientName` 缓存，退出登录时 [dispose] 清掉。
+  /// 全 App 唯一的“当前通话”广播。
+  ///
+  /// 多账号时 `Matrix.of(context).client` 可能不是发起通话那个客户端，
+  /// 界面绝不能只听某一个 [MatrixVoip] 实例的 [activeCall]（那样会看不到
+  /// 通话页），所以这里再广播一份全局状态，通话页和浮层都听它。
+  static final ValueNotifier<CallSession?> activeSession = ValueNotifier(null);
+
+  static MatrixVoip? _activeVoip;
+
+  /// 当前通话所属的管理器。
+  static MatrixVoip? get activeVoip => _activeVoip;
+
+  /// 取（必要时创建）某个客户端的通话管理器，退出登录时 [dispose] 清掉。
   static MatrixVoip ensure(Client client) {
-    final key = client.clientName;
-    final existing = _instances[key];
-    if (existing != null) {
-      if (identical(existing.client, client)) return existing;
-      unawaited(existing.dispose());
-    }
+    final existing = _instances[client];
+    if (existing != null) return existing;
     final delegate = VoipWebRtcDelegate();
     final created = MatrixVoip._(client, delegate);
-    _instances[key] = created;
+    _instances[client] = created;
     return created;
   }
 
-  static MatrixVoip? of(Client client) => _instances[client.clientName];
+  static MatrixVoip? of(Client client) => _instances[client];
+
+  /// 通话页是否已经打开，避免重复 push。
+  static bool pageOpen = false;
+
+  /// 打开全屏通话页（主叫、来电、点「返回通话」都走这里）。
+  static void openCallPage() {
+    if (pageOpen || activeSession.value == null) return;
+    pageOpen = true;
+    try {
+      FluffyChatApp.router.push('/call');
+    } catch (e) {
+      pageOpen = false;
+      Logs().w('[VoIP] 打开通话页失败', e);
+    }
+  }
 
   /// 只给 STUN，够局域网 / Tailscale 直连用；公网互打要先有 TURN。
   static const _stunServers = [
@@ -61,11 +86,22 @@ class MatrixVoip extends VoIP {
   AudioPlayer? _ringtonePlayer;
   bool speakerOn = false;
 
+  /// 接通时间，用来算通话时长（聊天页横条用）。
+  DateTime? connectedAt;
+
   Room? get room => activeCall.value?.room;
   CallSession? get session => activeCall.value;
   bool get hasCall => activeCall.value != null;
 
-  void _bump() => revision.value = revision.value + 1;
+  void _bump() {
+    revision.value = revision.value + 1;
+    final call = activeCall.value;
+    _activeVoip = call == null
+        ? (_activeVoip == this ? null : _activeVoip)
+        : this;
+    // 全局广播：浮层与通话页只认这个，避免多账号时听错实例。
+    if (activeSession.value != call) activeSession.value = call;
+  }
 
   @override
   Future<List<Map<String, dynamic>>> getIceServers() async {
@@ -78,10 +114,15 @@ class MatrixVoip extends VoIP {
 
   /// 主动呼叫。返回 null 表示已经有别的通话在跑了。
   Future<CallSession?> startCall(Room room, CallType type) async {
-    if (hasCall) return null;
+    if (hasCall) {
+      Logs().i('[VoIP] 已有通话 ${activeCall.value?.callId}，忽略新呼叫');
+      return null;
+    }
     final peer = room.directChatMatrixID;
+    Logs().i('[VoIP] 发起 ${type.name} 通话 room=${room.id} peer=$peer');
     await _setSpeakerphone(false);
     final call = await inviteToCall(room, type, userId: peer);
+    Logs().i('[VoIP] 通话已发出 callId=${call.callId}');
     activeCall.value = call;
     _bump();
     return call;
@@ -89,14 +130,20 @@ class MatrixVoip extends VoIP {
 
   Future<void> handleNewCall(CallSession session) async {
     if (session.isGroupCall) return;
+    Logs().i(
+      '[VoIP] 新通话 callId=${session.callId} outgoing=${session.isOutgoing}',
+    );
     if (session.isOutgoing) {
       activeCall.value ??= session;
       _bump();
+      openCallPage();
       return;
     }
     activeCall.value = session;
     await startRingtone();
     _bump();
+    // 来电也直接进全屏通话页（提示词要求：不要弹窗，也不要只响铃没界面）。
+    openCallPage();
   }
 
   Future<void> handleCallEnded(CallSession session) async {
@@ -113,7 +160,17 @@ class MatrixVoip extends VoIP {
   void attachSession(CallSession session) {
     if (!_attached.add(session)) return;
     session.onCallStateChanged.stream.listen((state) {
-      if (state == CallState.kEnded) unawaited(stopRingtone());
+      if (state == CallState.kConnected) connectedAt ??= DateTime.now();
+      if (state == CallState.kEnded) {
+        unawaited(stopRingtone());
+        // 通话页没打开时（比如在别的页面挂断、对方超时），1.5 秒后自动清掉，
+        // 不然聊天页的「正在通话中」横条会一直挂着。
+        if (!pageOpen) {
+          unawaited(
+            Future<void>.delayed(const Duration(milliseconds: 1500), clear),
+          );
+        }
+      }
       _bump();
     });
     session.onCallEventChanged.stream.listen((_) => _bump());
@@ -222,6 +279,10 @@ class MatrixVoip extends VoIP {
   Future<void> clear() async {
     final call = activeCall.value;
     activeCall.value = null;
+    connectedAt = null;
+    MatrixVoip.pageOpen = false;
+    // 先把界面切回去，再去慢慢释放资源，避免挂断后画面卡住。
+    _bump();
     await stopRingtone();
     if (call != null) {
       _attached.remove(call);
@@ -249,6 +310,6 @@ class MatrixVoip extends VoIP {
   Future<void> dispose() async {
     await clear();
     unawaited(onIncomingGroupCall.close());
-    _instances.remove(client.clientName);
+    _instances.remove(client);
   }
 }

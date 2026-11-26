@@ -6,12 +6,14 @@ import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/moments/moment_image.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
 import 'package:fluffychat/utils/moments/moments_service.dart';
+import 'package:fluffychat/utils/voip/call_actions.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:matrix/matrix.dart';
 
 /// 好友资料页：备注、发消息、删除好友。
 class FriendProfilePage extends StatefulWidget {
@@ -26,7 +28,8 @@ class FriendProfilePage extends StatefulWidget {
 class _FriendProfilePageState extends State<FriendProfilePage> {
   FriendsService get _service => FriendsService(Matrix.of(context).client);
 
-  MomentsService get _momentsService => MomentsService(Matrix.of(context).client);
+  MomentsService get _momentsService =>
+      MomentsService(Matrix.of(context).client);
 
   List<String> _recentMomentImages = const [];
   bool _momentsLoaded = false;
@@ -86,6 +89,21 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
     }
   }
 
+  Future<void> _startCall(CallType type) async {
+    try {
+      final roomId = await _service.openDirectChat(widget.userId);
+      if (!mounted) return;
+      final room = Matrix.of(context).client.getRoomById(roomId);
+      if (room == null) return;
+      await startChatCall(context, room, type);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(L10n.of(context).callStartFailed)));
+    }
+  }
+
   Future<void> _setRemark() async {
     final l10n = L10n.of(context);
     final friend = _service.load().friend(widget.userId);
@@ -135,9 +153,7 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
             ),
           ),
           const SizedBox(height: 12),
-          Center(
-            child: Text(title, style: theme.textTheme.titleLarge),
-          ),
+          Center(child: Text(title, style: theme.textTheme.titleLarge)),
           const SizedBox(height: 4),
           Center(
             child: Text(
@@ -185,17 +201,28 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
             onTap: _sendMessage,
           ),
           ListTile(
+            leading: const Icon(Icons.call_outlined),
+            title: Text(l10n.callVoice),
+            onTap: () => _startCall(CallType.kVoice),
+          ),
+          ListTile(
+            leading: const Icon(Icons.videocam_outlined),
+            title: Text(l10n.callVideo),
+            onTap: () => _startCall(CallType.kVideo),
+          ),
+          ListTile(
             leading: const Icon(Icons.edit_outlined),
             title: Text(l10n.setRemark),
             subtitle: Text(
-              (friend?.remark ?? '').isEmpty
-                  ? l10n.remarkHint
-                  : friend!.remark,
+              (friend?.remark ?? '').isEmpty ? l10n.remarkHint : friend!.remark,
             ),
             onTap: _setRemark,
           ),
           ListTile(
-            leading: Icon(Icons.person_remove_outlined, color: theme.colorScheme.error),
+            leading: Icon(
+              Icons.person_remove_outlined,
+              color: theme.colorScheme.error,
+            ),
             title: Text(
               l10n.removeFriend,
               style: TextStyle(color: theme.colorScheme.error),

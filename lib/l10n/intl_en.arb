@@ -3050,7 +3050,7 @@
   "motionReducedHint": "The system asks for reduced motion, so transitions are disabled",
   "callVoice": "Voice call",
   "callVideo": "Video call",
-  "callWaiting": "Waiting for the other side to accept…",
+  "callWaiting": "Waiting for the other side to answer…",
   "callIncomingVoice": "Voice call invitation",
   "callIncomingVideo": "Video call invitation",
   "callConnecting": "Connecting…",
@@ -3070,5 +3070,26 @@
   "callCameraOff": "Turn camera off",
   "callSwitchCamera": "Switch camera",
   "callAlreadyInCall": "A call is already in progress",
-  "callStartFailed": "Could not start the call"
+  "callStartFailed": "Could not start the call",
+  "callRejected": "Call declined",
+  "callCancel": "Cancel",
+  "callMicOn": "Microphone on",
+  "callMicOff": "Microphone off",
+  "callSpeakerOn": "Speaker on",
+  "callSwitchVideo": "Switch to video",
+  "callBackToCall": "Back to call",
+  "callMinimize": "Minimize",
+  "callInProgress": "In call · {duration}",
+  "@callInProgress": {
+    "placeholders": {"duration": {"type": "String"}}
+  },
+  "callInviteVoice": "{name} invites you to a voice call",
+  "@callInviteVoice": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "callInviteVideo": "{name} invites you to a video call",
+  "@callInviteVideo": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "callVideoSwitchUnavailable": "Switching to video mid-call is not supported yet, please hang up and start a video call"
 }

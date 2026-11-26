@@ -3050,12 +3050,12 @@
   "motionReducedHint": "系统已开启「移除动画」，转场按关闭动画处理",
   "callVoice": "语音通话",
   "callVideo": "视频通话",
-  "callWaiting": "正在等待对方接受…",
+  "callWaiting": "正在等待对方接受邀请…",
   "callIncomingVoice": "邀请你语音通话",
   "callIncomingVideo": "邀请你视频通话",
   "callConnecting": "正在连接…",
   "callEnded": "通话结束",
-  "callNoAnswer": "对方没有接听",
+  "callNoAnswer": "对方无应答",
   "callMissed": "未接来电",
   "callBusy": "对方正在通话中",
   "callFailed": "通话失败，请检查网络",
@@ -3070,5 +3070,26 @@
   "callCameraOff": "关闭摄像头",
   "callSwitchCamera": "切换摄像头",
   "callAlreadyInCall": "已有正在进行的通话",
-  "callStartFailed": "无法发起通话"
+  "callStartFailed": "无法发起通话",
+  "callRejected": "对方已拒绝",
+  "callCancel": "取消",
+  "callMicOn": "麦克风已开",
+  "callMicOff": "麦克风已关",
+  "callSpeakerOn": "扬声器已开",
+  "callSwitchVideo": "切换视频",
+  "callBackToCall": "返回通话",
+  "callMinimize": "最小化",
+  "callInProgress": "正在通话中 · {duration}",
+  "@callInProgress": {
+    "placeholders": {"duration": {"type": "String"}}
+  },
+  "callInviteVoice": "{name} 邀请你语音通话",
+  "@callInviteVoice": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "callInviteVideo": "{name} 邀请你视频通话",
+  "@callInviteVideo": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "callVideoSwitchUnavailable": "暂不支持中途切换视频，请挂断后改用视频通话"
 }

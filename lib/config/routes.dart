@@ -45,6 +45,7 @@ import 'package:fluffychat/pages/settings_password/settings_password.dart';
 import 'package:fluffychat/pages/settings_security/settings_security.dart';
 import 'package:fluffychat/pages/settings_style/settings_style.dart';
 import 'package:fluffychat/pages/sign_in/sign_in_page.dart';
+import 'package:fluffychat/pages/voip/voip_call_page.dart';
 import 'package:fluffychat/widgets/config_viewer.dart';
 import 'package:fluffychat/widgets/layouts/empty_page.dart';
 import 'package:fluffychat/widgets/layouts/two_column_layout.dart';
@@ -154,6 +155,12 @@ abstract class AppRoutes {
       path: '/me',
       pageBuilder: (context, state) =>
           defaultPageBuilder(context, state, const MePage()),
+    ),
+    // 1 对 1 语音/视频通话：全屏独立路由。
+    GoRoute(
+      path: '/call',
+      pageBuilder: (context, state) =>
+          defaultPageBuilder(context, state, const VoipCallPage()),
     ),
     // 朋友圈：全屏页面，故意不放底部导航（它是从发现页点进来的子页面）。
     GoRoute(

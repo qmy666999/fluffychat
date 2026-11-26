@@ -6,7 +6,7 @@
 import 'dart:async';
 
 import 'package:fluffychat/l10n/l10n.dart';
-import 'package:fluffychat/utils/voip/matrix_voip.dart';
+import 'package:fluffychat/utils/voip/call_actions.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
 import 'package:go_router/go_router.dart';
@@ -178,21 +178,8 @@ class ChatSettingsPopupMenuState extends State<ChatSettingsPopupMenu> {
       widget.room.membership == Membership.join &&
       widget.room.summary.mJoinedMemberCount == 2;
 
-  Future<void> _startCall(CallType type) async {
-    final l10n = L10n.of(context);
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    final voip = MatrixVoip.ensure(widget.room.client);
-    if (voip.hasCall) {
-      messenger?.showSnackBar(SnackBar(content: Text(l10n.callAlreadyInCall)));
-      return;
-    }
-    try {
-      await voip.startCall(widget.room, type);
-    } catch (e, s) {
-      Logs().w('[VoIP] 发起通话失败', e, s);
-      messenger?.showSnackBar(SnackBar(content: Text(l10n.callStartFailed)));
-    }
-  }
+  Future<void> _startCall(CallType type) =>
+      startChatCall(context, widget.room, type);
 
   void _showChatDetails() {
     if (GoRouterState.of(context).uri.path.endsWith('/details')) {

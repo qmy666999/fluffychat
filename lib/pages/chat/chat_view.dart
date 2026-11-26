@@ -8,6 +8,7 @@ import 'dart:ui' as ui;
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/chat/active_call_banner.dart';
 import 'package:fluffychat/pages/chat/chat.dart';
 import 'package:fluffychat/pages/chat/chat_app_bar_list_tile.dart';
 import 'package:fluffychat/pages/chat/chat_app_bar_title.dart';
@@ -371,6 +372,13 @@ class ChatView extends StatelessWidget {
                         GestureDetector(
                           onTap: controller.clearSingleSelectedEvent,
                           child: ChatEventList(controller: controller),
+                        ),
+                        // 正在通话时置顶一条兜底横条：能回通话页，也能直接挂断。
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: ActiveCallBanner(roomId: controller.room.id),
                         ),
                         Positioned(
                           bottom: 0,
