@@ -182,9 +182,9 @@ class _MomentsPageState extends State<MomentsPage> {
       await _refresh();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -201,9 +201,9 @@ class _MomentsPageState extends State<MomentsPage> {
       await _refresh();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -428,14 +428,14 @@ class _MomentsPageState extends State<MomentsPage> {
       setState(() => _cover = cover);
     } on UnsupportedAvatarFormat {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.avatarUnsupportedFormat)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.avatarUnsupportedFormat)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 }
@@ -483,8 +483,8 @@ class _MomentCard extends StatelessWidget {
               children: [
                 Text(
                   author,
-                  style: const TextStyle(
-                    color: Color(0xFF576B95),
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                   ),
@@ -561,8 +561,8 @@ class _MomentCard extends StatelessWidget {
                         if (data.likers.isNotEmpty)
                           Text(
                             '❤️ ${data.likers.map(name).join('、')}',
-                            style: const TextStyle(
-                              color: Color(0xFF576B95),
+                            style: TextStyle(
+                              color: theme.colorScheme.primary,
                               fontSize: 13,
                             ),
                           ),
@@ -574,8 +574,8 @@ class _MomentCard extends StatelessWidget {
                                 children: [
                                   TextSpan(
                                     text: '${name(comment.senderId)}：',
-                                    style: const TextStyle(
-                                      color: Color(0xFF576B95),
+                                    style: TextStyle(
+                                      color: theme.colorScheme.primary,
                                     ),
                                   ),
                                   TextSpan(text: comment.body),

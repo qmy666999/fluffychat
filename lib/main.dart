@@ -23,6 +23,7 @@ import 'package:matrix/matrix.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_html/universal_html.dart' as web;
 
+import 'config/motion_settings.dart';
 import 'config/server_endpoints.dart';
 import 'config/setting_keys.dart';
 import 'utils/background_push.dart';
@@ -74,6 +75,8 @@ void main(List<String> args) => runZonedGuarded(() async {
   Logs().i('[ServerEndpoints] using ${ServerEndpoints.current}');
 
   final store = await AppSettings.init();
+  // 动效设置要在任何路由构造之前读进内存（路由里取的是静态字段，不能 await）。
+  MotionSettings.load(store);
   Logs().i('Welcome to ${AppSettings.applicationName.value} <3');
 
   kEnableMatrixSdkBenchmarks = AppSettings.benchmarksInLogs.value;

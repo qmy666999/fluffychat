@@ -5,6 +5,8 @@
 
 import 'dart:async';
 
+import 'package:animations/animations.dart';
+import 'package:fluffychat/config/motion_settings.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/pages/archive/archive.dart';
 import 'package:fluffychat/pages/bootstrap/bootstrap_page.dart';
@@ -123,9 +125,7 @@ abstract class AppRoutes {
           pageBuilder: (context, state) => defaultPageBuilder(
             context,
             state,
-            AddFriendPage(
-              initialQuery: state.uri.queryParameters['q'],
-            ),
+            AddFriendPage(initialQuery: state.uri.queryParameters['q']),
           ),
         ),
         GoRoute(
@@ -602,6 +602,93 @@ abstract class AppRoutes {
     child: child,
   );
 
+  /// 四个平级 tab 的路径。判断用：tab 之间切换不用纵向共享轴。
+  static const _tabPaths = {'/rooms', '/contacts', '/discover', '/me'};
+
+  /// 按用户在设置里选的动效风格生成页面转场。
+  ///
+  /// 桌面端的 column 模式不参与（没有整页切换感，动起来反而乱）。
+  static Page motionPageBuilder(GoRouterState state, Widget child) {
+    final isTab = _tabPaths.contains(state.uri.path);
+    final style = MotionSettings.effectiveStyle(isTab: isTab);
+
+    if (style == MotionStyle.none) {
+      return CustomTransitionPage(
+        key: state.pageKey,
+        restorationId: state.pageKey.value,
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+        transitionsBuilder: (_, _, _, child) => child,
+        child: child,
+      );
+    }
+
+    final duration = MotionSettings.scaled(MotionSettings.baseDuration);
+    return CustomTransitionPage(
+      key: state.pageKey,
+      restorationId: state.pageKey.value,
+      transitionDuration: duration,
+      reverseTransitionDuration: duration,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        final fillColor = Theme.of(context).colorScheme.surface;
+        switch (style) {
+          case MotionStyle.fadeThrough:
+            return FadeThroughTransition(
+              animation: animation,
+              secondaryAnimation: secondaryAnimation,
+              fillColor: fillColor,
+              child: child,
+            );
+          case MotionStyle.sharedAxisX:
+            return SharedAxisTransition(
+              animation: animation,
+              secondaryAnimation: secondaryAnimation,
+              transitionType: SharedAxisTransitionType.horizontal,
+              fillColor: fillColor,
+              child: child,
+            );
+          case MotionStyle.sharedAxisY:
+            return SharedAxisTransition(
+              animation: animation,
+              secondaryAnimation: secondaryAnimation,
+              transitionType: SharedAxisTransitionType.vertical,
+              fillColor: fillColor,
+              child: child,
+            );
+          case MotionStyle.containerTransform:
+            return SharedAxisTransition(
+              animation: animation,
+              secondaryAnimation: secondaryAnimation,
+              transitionType: SharedAxisTransitionType.scaled,
+              fillColor: fillColor,
+              child: child,
+            );
+          case MotionStyle.zoom:
+          case MotionStyle.system:
+            // 交回给当前平台自己的转场实现（Android 是 Zoom，iOS 是 Cupertino）。
+            final route = ModalRoute.of(context);
+            final theme = Theme.of(context);
+            final builder =
+                theme.pageTransitionsTheme.builders[theme.platform] ??
+                const ZoomPageTransitionsBuilder();
+            if (route is PageRoute) {
+              return builder.buildTransitions(
+                route,
+                context,
+                animation,
+                secondaryAnimation,
+                child,
+              );
+            }
+            return child;
+          case MotionStyle.none:
+            return child;
+        }
+      },
+      child: child,
+    );
+  }
+
   static Page defaultPageBuilder(
     BuildContext context,
     GoRouterState state,
@@ -615,10 +702,6 @@ abstract class AppRoutes {
     }
     return FluffyThemes.isColumnMode(context)
         ? noTransitionPageBuilder(context, state, child)
-        : MaterialPage(
-            key: state.pageKey,
-            restorationId: state.pageKey.value,
-            child: child,
-          );
+        : motionPageBuilder(state, child);
   }
 }

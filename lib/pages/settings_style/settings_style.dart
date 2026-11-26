@@ -4,6 +4,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:file_picker/file_picker.dart';
+import 'package:fluffychat/config/appearance_settings.dart';
+import 'package:fluffychat/config/motion_settings.dart';
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/utils/account_config.dart';
 import 'package:fluffychat/utils/file_selector.dart';
@@ -22,11 +24,53 @@ class SettingsStyle extends StatefulWidget {
 }
 
 class SettingsStyleController extends State<SettingsStyle> {
-  void setChatColor(Color? color) {
+  Future<void> setChatColor(Color? color) async {
     AppSettings.colorSchemeSeedInt.setItem(
       color?.toARGB32() ?? AppSettings.colorSchemeSeedInt.defaultValue,
     );
-    ThemeController.of(context).setPrimaryColor(color);
+    await ThemeController.of(context).setPrimaryColor(color);
+    setState(() {});
+  }
+
+  /// 是否跟随系统壁纸取色（Material You）。
+  bool get useDynamicColor => ThemeController.of(context).useDynamicColor;
+
+  /// 配色风格。
+  SchemeVariantOption get schemeVariant => ThemeController.of(context).variant;
+
+  Future<void> setUseDynamicColor(bool value) async {
+    await ThemeController.of(context).setUseDynamicColor(value);
+    setState(() {});
+  }
+
+  Future<void> setSchemeVariant(SchemeVariantOption value) async {
+    await ThemeController.of(context).setVariant(value);
+    setState(() {});
+  }
+
+  /// 页面转场风格。
+  MotionStyle get motionStyle => MotionSettings.style;
+
+  /// 动画速度倍率（0.5x ~ 1.5x）。
+  double get motionSpeed => MotionSettings.speed;
+
+  Future<void> setMotionStyle(MotionStyle style) async {
+    await MotionSettings.setStyle(style);
+    setState(() {});
+  }
+
+  /// 拖动过程中只改内存里的值（实时预览），松手才落盘。
+  void previewMotionSpeed(double value) {
+    MotionSettings.speed = value.clamp(
+      MotionSettings.minSpeed,
+      MotionSettings.maxSpeed,
+    );
+    setState(() {});
+  }
+
+  Future<void> saveMotionSpeed(double value) async {
+    await MotionSettings.setSpeed(value);
+    setState(() {});
   }
 
   Future<void> setWallpaper() async {

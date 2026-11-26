@@ -40,16 +40,22 @@ abstract class FluffyThemes {
   static const Duration animationDuration = Duration(milliseconds: 250);
   static const Curve animationCurve = Curves.easeInOut;
 
+  /// [scheme] 非空时直接用它（系统壁纸取色 / Material You 的完整色板），
+  /// 否则用 [seed] 按 [variant] 现场派生。
   static ThemeData buildTheme(
     BuildContext context,
-    Brightness brightness, [
+    Brightness brightness, {
     Color? seed,
-  ]) {
-    final colorScheme = ColorScheme.fromSeed(
-      brightness: brightness,
-      seedColor: seed ?? Color(AppSettings.colorSchemeSeedInt.value),
-      dynamicSchemeVariant: DynamicSchemeVariant.rainbow,
-    );
+    ColorScheme? scheme,
+    DynamicSchemeVariant variant = DynamicSchemeVariant.tonalSpot,
+  }) {
+    final colorScheme =
+        scheme ??
+        ColorScheme.fromSeed(
+          brightness: brightness,
+          seedColor: seed ?? Color(AppSettings.colorSchemeSeedInt.value),
+          dynamicSchemeVariant: variant,
+        );
     final isColumnMode = FluffyThemes.isColumnMode(context);
     final dividerColor = brightness == Brightness.dark
         ? colorScheme.surfaceContainerHighest

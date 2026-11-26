@@ -86,16 +86,24 @@ class FluffyChatApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ThemeBuilder(
-      builder: (context, themeMode, primaryColor) => MaterialApp.router(
+      builder: (context, settings) => MaterialApp.router(
         title: AppSettings.applicationName.value,
-        themeMode: themeMode,
+        themeMode: settings.themeMode,
         debugShowCheckedModeBanner: false,
         locale: locale,
-        theme: FluffyThemes.buildTheme(context, Brightness.light, primaryColor),
+        theme: FluffyThemes.buildTheme(
+          context,
+          Brightness.light,
+          seed: settings.primaryColor,
+          scheme: settings.dynamicSchemeFor(Brightness.light),
+          variant: settings.variant.variant,
+        ),
         darkTheme: FluffyThemes.buildTheme(
           context,
           Brightness.dark,
-          primaryColor,
+          seed: settings.primaryColor,
+          scheme: settings.dynamicSchemeFor(Brightness.dark),
+          variant: settings.variant.variant,
         ),
         scrollBehavior: CustomScrollBehavior(),
         localizationsDelegates: [
