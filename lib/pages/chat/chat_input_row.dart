@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:emoji_picker_flutter/locales/default_emoji_set_locale.dart';
 import 'package:fluffychat/config/setting_keys.dart';
@@ -21,6 +20,7 @@ import '../../config/themes.dart';
 import 'chat.dart';
 import 'chat_add_menu.dart';
 import 'input_bar.dart';
+import 'recording_bubble.dart';
 
 /// 微信式输入栏：
 ///
@@ -60,6 +60,11 @@ class _ChatInputRowState extends State<ChatInputRow> {
   Offset? _downPosition;
   Timer? _maxDurationTimer;
 
+  /// 录音浮层挂在根 Overlay 上（输入栏外面，见 recording_bubble.dart 的注释）
+  OverlayEntry? _overlayEntry;
+  final ValueNotifier<bool> _overlayVisible = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> _cancelNotifier = ValueNotifier<bool>(false);
+
   ChatController get controller => widget.controller;
 
   Future<void> _startHold(RecordingViewModelState recording) async {
@@ -79,6 +84,80 @@ class _ChatInputRowState extends State<ChatInputRow> {
     // 录满 60 秒自动发送（微信的上限）
     _maxDurationTimer?.cancel();
     _maxDurationTimer = Timer(_maxDuration, () => _autoSend(recording));
+    debugPrint('[record] 录音开始，显示浮层 overlay=${_overlayEntry != null}');
+    _showRecordingOverlay(recording);
+  }
+
+  /// 电量/时长的读取口，交给 RecordingBubble 自己按 100ms 采样
+  double? _currentLevel(RecordingViewModelState recording) {
+    final amplitudes = recording.amplitudeTimeline;
+    if (amplitudes.isEmpty) return null;
+    if (amplitudes.length >= 6) {
+      final tail = amplitudes.sublist(amplitudes.length - 6);
+      final flat = tail.every((value) => (value - tail.first).abs() < 0.5);
+      if (flat) return null;
+    }
+    final recent = amplitudes.length <= 40
+        ? amplitudes
+        : amplitudes.sublist(amplitudes.length - 40);
+    var peak = 0.0;
+    for (final value in recent) {
+      if (value > peak) peak = value;
+    }
+    // 有些机型拿不到真实音量，一直是同一个值 → 让浮层用 sin 伪波形
+    if (peak <= 1.5) return null;
+    return amplitudes.last / peak;
+  }
+
+  void _showRecordingOverlay(RecordingViewModelState recording) {
+    _hideRecordingOverlay(immediate: true);
+    final overlay = Overlay.of(context, rootOverlay: true);
+    _overlayVisible.value = true;
+    _cancelNotifier.value = _willCancel;
+    _overlayEntry = OverlayEntry(
+      builder: (overlayContext) => Positioned(
+        top: MediaQuery.sizeOf(overlayContext).height * 0.28,
+        left: 0,
+        right: 0,
+        child: IgnorePointer(
+          child: Center(
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _overlayVisible,
+              builder: (context, visible, child) {
+                return ValueListenableBuilder<bool>(
+                  valueListenable: _cancelNotifier,
+                  builder: (context, cancelling, child) => RecordingBubble(
+                    level: () => _currentLevel(recording),
+                    duration: () => recording.duration,
+                    cancelling: cancelling,
+                    visible: visible,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(_overlayEntry!);
+    debugPrint('[record] 浮层已插入 overlay');
+  }
+
+  /// immediate = true 立即移除（开始新一次录音 / dispose 时用），
+  /// 否则先播 200ms 淡出再移除。
+  void _hideRecordingOverlay({bool immediate = false}) {
+    final entry = _overlayEntry;
+    if (entry == null) return;
+    _overlayEntry = null;
+    _overlayVisible.value = false;
+    debugPrint('[record] 隐藏浮层 immediate=$immediate');
+    if (immediate) {
+      if (entry.mounted) entry.remove();
+      return;
+    }
+    Future<void>.delayed(const Duration(milliseconds: 220), () {
+      if (entry.mounted) entry.remove();
+    });
   }
 
   /// 到 60 秒上限时自动结束并发送，不需要用户松手
@@ -90,6 +169,7 @@ class _ChatInputRowState extends State<ChatInputRow> {
       _pressing = false;
       _willCancel = false;
     });
+    _hideRecordingOverlay();
     await recording.stopAndSend(controller.onVoiceMessageSend);
   }
 
@@ -117,6 +197,7 @@ class _ChatInputRowState extends State<ChatInputRow> {
     final willCancel = dy > _cancelThreshold && dx > _cancelSideThreshold;
     if (willCancel != _willCancel) {
       setState(() => _willCancel = willCancel);
+      _cancelNotifier.value = willCancel;
     }
   }
 
@@ -133,6 +214,8 @@ class _ChatInputRowState extends State<ChatInputRow> {
       _pressing = false;
       _willCancel = false;
     });
+    _cancelNotifier.value = false;
+    _hideRecordingOverlay();
     if (!wasRecording) return;
     if (cancel) {
       recording.cancel();
@@ -154,6 +237,9 @@ class _ChatInputRowState extends State<ChatInputRow> {
   @override
   void dispose() {
     _maxDurationTimer?.cancel();
+    _hideRecordingOverlay(immediate: true);
+    _overlayVisible.dispose();
+    _cancelNotifier.dispose();
     super.dispose();
   }
 
@@ -191,22 +277,6 @@ class _ChatInputRowState extends State<ChatInputRow> {
                     recording,
                     textMessageOnly: textMessageOnly,
                   ),
-            if (recording.isRecording)
-              Positioned(
-                left: 0,
-                right: 0,
-                // 浮层要出现在屏幕中上部（微信的位置），所以按屏幕高度反推底部距离；
-                // Stack 本身只有输入栏那么高，用负/clipBehavior: none 让它画到外面去。
-                bottom: MediaQuery.sizeOf(context).height * 0.5,
-                child: IgnorePointer(
-                  child: Center(
-                    child: _RecordingOverlay(
-                      recording: recording,
-                      willCancel: _willCancel,
-                    ),
-                  ),
-                ),
-              ),
           ],
         );
       },
@@ -480,225 +550,6 @@ class _ChatInputRowState extends State<ChatInputRow> {
             : const SizedBox.shrink(),
       ],
     );
-  }
-}
-
-/// 微信式录音浮层：胶囊 + 柱状声波 + 时长。
-///
-/// 不要再做成圆圈向外扩散的波纹——那是录音机 App 的风格，
-/// 微信是**横向柱状波**：中间高两边低，随音量起伏，新的从右边进来。
-class _RecordingOverlay extends StatefulWidget {
-  const _RecordingOverlay({required this.recording, required this.willCancel});
-
-  final RecordingViewModelState recording;
-  final bool willCancel;
-
-  @override
-  State<_RecordingOverlay> createState() => _RecordingOverlayState();
-}
-
-class _RecordingOverlayState extends State<_RecordingOverlay>
-    with SingleTickerProviderStateMixin {
-  /// 柱子根数（微信大约 30~40 根）
-  static const int _barCount = 36;
-
-  /// 从右往左滚动的音量序列，长度固定 _barCount
-  final List<double> _levels = <double>[];
-
-  /// 平滑后的当前音量（0..1），避免柱子一跳一跳
-  double _smoothed = 0;
-
-  Timer? _ticker;
-  late final AnimationController _appear;
-  int _elapsedTicks = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _appear = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 200),
-    )..forward();
-    // 先铺一段静态波形，避免刚按下时是一条直线
-    for (var i = 0; i < _barCount; i++) {
-      _levels.add(0.2 + 0.6 * math.sin(i / 4).abs());
-    }
-    _ticker = Timer.periodic(const Duration(milliseconds: 100), (_) => _tick());
-  }
-
-  @override
-  void dispose() {
-    _ticker?.cancel();
-    _appear.dispose();
-    super.dispose();
-  }
-
-  void _tick() {
-    if (!mounted) return;
-    _elapsedTicks++;
-    final target = _currentLevel;
-    // 起音快、回落慢，看起来才像在说话
-    final factor = target > _smoothed ? 0.55 : 0.22;
-    _smoothed = math.max(
-      0.05,
-      math.min(1.0, _smoothed + (target - _smoothed) * factor),
-    );
-    setState(() {
-      _levels.add(_smoothed);
-      while (_levels.length > _barCount) {
-        _levels.removeAt(0);
-      }
-    });
-  }
-
-  /// 当前音量（0..1）。
-  ///
-  /// record 的 Amplitude.current 是 dBFS（负数），RecordingViewModel 已经
-  /// 映射成 1~100，不同机型量级还不一样，所以这里按「最近 40 个采样的峰值」
-  /// 归一化，而不是写死上下限；拿不到真实振幅时退化成 sin 伪波形。
-  double get _currentLevel {
-    final amplitudes = widget.recording.amplitudeTimeline;
-    if (amplitudes.isEmpty) return _pseudoLevel;
-    if (amplitudes.length >= 6) {
-      final tail = amplitudes.sublist(amplitudes.length - 6);
-      final flat = tail.every((value) => (value - tail.first).abs() < 0.5);
-      if (flat) return _pseudoLevel;
-    }
-    final recent = amplitudes.length <= 40
-        ? amplitudes
-        : amplitudes.sublist(amplitudes.length - 40);
-    var peak = 0.0;
-    for (final value in recent) {
-      if (value > peak) peak = value;
-    }
-    // 全程都是 1 这种恒定值（有些机型拿不到真实音量）→ 伪波形
-    if (peak <= 1.5) return _pseudoLevel;
-    return math.max(0.05, math.min(1.0, amplitudes.last / peak));
-  }
-
-  double get _pseudoLevel {
-    final t = _elapsedTicks / 10;
-    return 0.2 + 0.6 * math.sin(t * 2.2).abs();
-  }
-
-  String get _durationLabel {
-    final duration = widget.recording.duration;
-    final minutes = duration.inMinutes;
-    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final cancelling = widget.willCancel;
-    final background = cancelling ? colorScheme.error : colorScheme.primary;
-    final foreground = cancelling ? colorScheme.onError : colorScheme.onPrimary;
-    final width = math.min(260.0, MediaQuery.sizeOf(context).width * 0.7);
-
-    return ScaleTransition(
-      scale: Tween<double>(
-        begin: 0.8,
-        end: 1,
-      ).animate(CurvedAnimation(parent: _appear, curve: Curves.easeOutCubic)),
-      child: FadeTransition(
-        opacity: _appear,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          width: width,
-          height: 90,
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.18),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 28),
-                  child: CustomPaint(
-                    painter: _WavePainter(
-                      levels: List<double>.of(_levels),
-                      color: foreground,
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 14,
-                bottom: 8,
-                child: Text(
-                  _durationLabel,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: foreground.withValues(alpha: 0.85),
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 柱状声波：中间高两边低，柱子从右往左滚。
-class _WavePainter extends CustomPainter {
-  const _WavePainter({required this.levels, required this.color});
-
-  final List<double> levels;
-  final Color color;
-
-  static const double _barWidth = 3;
-  static const double _gap = 2;
-  static const double _minHeight = 4;
-  static const double _maxHeight = 40;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final total = levels.length;
-    if (total == 0) return;
-    const step = _barWidth + _gap;
-    final startX = (size.width - (step * total - _gap)) / 2;
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    for (var i = 0; i < total; i++) {
-      // 山形包络：中间 1.0，两端 0.45
-      final distance = (i - (total - 1) / 2).abs() / ((total - 1) / 2);
-      final envelope = 1 - distance * 0.55;
-      final height =
-          _minHeight + levels[i] * (_maxHeight - _minHeight) * envelope;
-      final rect = RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: Offset(startX + i * step + _barWidth / 2, size.height / 2),
-          width: _barWidth,
-          height: height,
-        ),
-        const Radius.circular(2),
-      );
-      canvas.drawRRect(rect, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_WavePainter oldDelegate) {
-    if (oldDelegate.color != color) return true;
-    if (oldDelegate.levels.length != levels.length) return true;
-    for (var i = 0; i < levels.length; i++) {
-      if (oldDelegate.levels[i] != levels[i]) return true;
-    }
-    return false;
   }
 }
 
