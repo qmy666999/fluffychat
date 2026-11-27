@@ -3232,5 +3232,6 @@
   "messageResend": "重新发送",
   "messageResendFailed": "重发失败，请检查网络",
   "messageResendFileMissing": "原始文件已不在，无法重发",
-  "momentLoadingMore": "正在加载…"
+  "momentLoadingMore": "正在加载…",
+  "voiceRecordingCancelled": "已取消"
 }

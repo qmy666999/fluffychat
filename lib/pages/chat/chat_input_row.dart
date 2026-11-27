@@ -3,6 +3,9 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:emoji_picker_flutter/locales/default_emoji_set_locale.dart';
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
@@ -45,11 +48,17 @@ class _ChatInputRowState extends State<ChatInputRow> {
   /// 上滑是否超过取消阈值
   bool _willCancel = false;
 
-  /// 取消阈值，向上滑超过这个距离就丢弃这条语音
-  static const double _cancelThreshold = 60;
+  /// 取消阈值：向上滑超过这个距离、并且往左滑出 [_cancelSideThreshold]，
+  /// 才算进入左上角的「取消」区（微信是斜着往左上丢）
+  static const double _cancelThreshold = 80;
+  static const double _cancelSideThreshold = 60;
+
+  /// 录音上限，到点自动发送
+  static const Duration _maxDuration = Duration(seconds: 60);
 
   int? _pointer;
   Offset? _downPosition;
+  Timer? _maxDurationTimer;
 
   ChatController get controller => widget.controller;
 
@@ -65,7 +74,23 @@ class _ChatInputRowState extends State<ChatInputRow> {
     if (!recording.isRecording) {
       // 没有麦克风权限或者启动失败，恢复按钮文案
       setState(() => _pressing = false);
+      return;
     }
+    // 录满 60 秒自动发送（微信的上限）
+    _maxDurationTimer?.cancel();
+    _maxDurationTimer = Timer(_maxDuration, () => _autoSend(recording));
+  }
+
+  /// 到 60 秒上限时自动结束并发送，不需要用户松手
+  Future<void> _autoSend(RecordingViewModelState recording) async {
+    if (_pointer == null || !recording.isRecording) return;
+    _pointer = null;
+    _downPosition = null;
+    setState(() {
+      _pressing = false;
+      _willCancel = false;
+    });
+    await recording.stopAndSend(controller.onVoiceMessageSend);
   }
 
   void _onPointerDown(
@@ -86,7 +111,10 @@ class _ChatInputRowState extends State<ChatInputRow> {
     if (event.pointer != _pointer) return;
     final start = _downPosition;
     if (start == null) return;
-    final willCancel = start.dy - event.position.dy > _cancelThreshold;
+    // 用「相对按下位置的偏移」判断，不写死坐标：往上 80dp 且往左 60dp 才算取消
+    final dy = start.dy - event.position.dy;
+    final dx = start.dx - event.position.dx;
+    final willCancel = dy > _cancelThreshold && dx > _cancelSideThreshold;
     if (willCancel != _willCancel) {
       setState(() => _willCancel = willCancel);
     }
@@ -96,6 +124,8 @@ class _ChatInputRowState extends State<ChatInputRow> {
     if (_pointer == null) return;
     _pointer = null;
     _downPosition = null;
+    _maxDurationTimer?.cancel();
+    _maxDurationTimer = null;
     final cancel = _willCancel;
     final tooShort = recording.duration < const Duration(seconds: 1);
     final wasRecording = recording.isRecording;
@@ -106,6 +136,9 @@ class _ChatInputRowState extends State<ChatInputRow> {
     if (!wasRecording) return;
     if (cancel) {
       recording.cancel();
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text(L10n.of(context).voiceRecordingCancelled)),
+      );
       return;
     }
     if (tooShort) {
@@ -116,6 +149,12 @@ class _ChatInputRowState extends State<ChatInputRow> {
       return;
     }
     await recording.stopAndSend(controller.onVoiceMessageSend);
+  }
+
+  @override
+  void dispose() {
+    _maxDurationTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -156,9 +195,9 @@ class _ChatInputRowState extends State<ChatInputRow> {
               Positioned(
                 left: 0,
                 right: 0,
-                // 浮层要出现在屏幕中间（微信的位置），所以按屏幕高度反推底部距离；
+                // 浮层要出现在屏幕中上部（微信的位置），所以按屏幕高度反推底部距离；
                 // Stack 本身只有输入栏那么高，用负/clipBehavior: none 让它画到外面去。
-                bottom: MediaQuery.sizeOf(context).height / 2 - 122,
+                bottom: MediaQuery.sizeOf(context).height * 0.5,
                 child: IgnorePointer(
                   child: Center(
                     child: _RecordingOverlay(
@@ -444,7 +483,10 @@ class _ChatInputRowState extends State<ChatInputRow> {
   }
 }
 
-/// 录音时浮在输入栏上方的小面板：声波 + 时长 + 松手提示。
+/// 微信式录音浮层：胶囊 + 柱状声波 + 时长。
+///
+/// 不要再做成圆圈向外扩散的波纹——那是录音机 App 的风格，
+/// 微信是**横向柱状波**：中间高两边低，随音量起伏，新的从右边进来。
 class _RecordingOverlay extends StatefulWidget {
   const _RecordingOverlay({required this.recording, required this.willCancel});
 
@@ -455,35 +497,88 @@ class _RecordingOverlay extends StatefulWidget {
   State<_RecordingOverlay> createState() => _RecordingOverlayState();
 }
 
-/// 微信式录音浮层：屏幕中间一个半透明黑圆，周围是随音量起伏的波纹，
-/// 圆下面是时长与「松开手指，发送」，上滑取消时整体变红。
 class _RecordingOverlayState extends State<_RecordingOverlay>
     with SingleTickerProviderStateMixin {
-  static const int _maxAmplitude = 200;
+  /// 柱子根数（微信大约 30~40 根）
+  static const int _barCount = 36;
 
-  late final AnimationController _ripple;
+  /// 从右往左滚动的音量序列，长度固定 _barCount
+  final List<double> _levels = <double>[];
+
+  /// 平滑后的当前音量（0..1），避免柱子一跳一跳
+  double _smoothed = 0;
+
+  Timer? _ticker;
+  late final AnimationController _appear;
+  int _elapsedTicks = 0;
 
   @override
   void initState() {
     super.initState();
-    _ripple = AnimationController(
+    _appear = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..repeat();
+      duration: const Duration(milliseconds: 200),
+    )..forward();
+    // 先铺一段静态波形，避免刚按下时是一条直线
+    for (var i = 0; i < _barCount; i++) {
+      _levels.add(0.2 + 0.6 * math.sin(i / 4).abs());
+    }
+    _ticker = Timer.periodic(const Duration(milliseconds: 100), (_) => _tick());
   }
 
   @override
   void dispose() {
-    _ripple.dispose();
+    _ticker?.cancel();
+    _appear.dispose();
     super.dispose();
   }
 
-  /// 0..1，取最近一次振幅。
-  double get _level {
+  void _tick() {
+    if (!mounted) return;
+    _elapsedTicks++;
+    final target = _currentLevel;
+    // 起音快、回落慢，看起来才像在说话
+    final factor = target > _smoothed ? 0.55 : 0.22;
+    _smoothed = math.max(
+      0.05,
+      math.min(1.0, _smoothed + (target - _smoothed) * factor),
+    );
+    setState(() {
+      _levels.add(_smoothed);
+      while (_levels.length > _barCount) {
+        _levels.removeAt(0);
+      }
+    });
+  }
+
+  /// 当前音量（0..1）。
+  ///
+  /// record 的 Amplitude.current 是 dBFS（负数），RecordingViewModel 已经
+  /// 映射成 1~100，不同机型量级还不一样，所以这里按「最近 40 个采样的峰值」
+  /// 归一化，而不是写死上下限；拿不到真实振幅时退化成 sin 伪波形。
+  double get _currentLevel {
     final amplitudes = widget.recording.amplitudeTimeline;
-    if (amplitudes.isEmpty) return 0;
-    final value = amplitudes.last.clamp(0, _maxAmplitude);
-    return value / _maxAmplitude;
+    if (amplitudes.isEmpty) return _pseudoLevel;
+    if (amplitudes.length >= 6) {
+      final tail = amplitudes.sublist(amplitudes.length - 6);
+      final flat = tail.every((value) => (value - tail.first).abs() < 0.5);
+      if (flat) return _pseudoLevel;
+    }
+    final recent = amplitudes.length <= 40
+        ? amplitudes
+        : amplitudes.sublist(amplitudes.length - 40);
+    var peak = 0.0;
+    for (final value in recent) {
+      if (value > peak) peak = value;
+    }
+    // 全程都是 1 这种恒定值（有些机型拿不到真实音量）→ 伪波形
+    if (peak <= 1.5) return _pseudoLevel;
+    return math.max(0.05, math.min(1.0, amplitudes.last / peak));
+  }
+
+  double get _pseudoLevel {
+    final t = _elapsedTicks / 10;
+    return 0.2 + 0.6 * math.sin(t * 2.2).abs();
   }
 
   String get _durationLabel {
@@ -495,103 +590,116 @@ class _RecordingOverlayState extends State<_RecordingOverlay>
 
   @override
   Widget build(BuildContext context) {
-    final l10n = L10n.of(context);
-    final theme = Theme.of(context);
-    final accent = widget.willCancel ? theme.colorScheme.error : Colors.white;
-    final level = _level;
+    final colorScheme = Theme.of(context).colorScheme;
+    final cancelling = widget.willCancel;
+    final background = cancelling ? colorScheme.error : colorScheme.primary;
+    final foreground = cancelling ? colorScheme.onError : colorScheme.onPrimary;
+    final width = math.min(260.0, MediaQuery.sizeOf(context).width * 0.7);
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: 180,
-          height: 180,
-          child: AnimatedBuilder(
-            animation: _ripple,
-            builder: (context, child) => CustomPaint(
-              painter: _RecordingRipplePainter(
-                progress: _ripple.value,
-                level: level,
-                color: accent,
+    return ScaleTransition(
+      scale: Tween<double>(
+        begin: 0.8,
+        end: 1,
+      ).animate(CurvedAnimation(parent: _appear, curve: Curves.easeOutCubic)),
+      child: FadeTransition(
+        opacity: _appear,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          width: width,
+          height: 90,
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
               ),
-              child: child,
-            ),
-            child: Center(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
-                width: 96,
-                height: 96,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.72),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  widget.willCancel ? Icons.close : Icons.mic,
-                  color: accent,
-                  size: 36,
+            ],
+          ),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 28),
+                  child: CustomPaint(
+                    painter: _WavePainter(
+                      levels: List<double>.of(_levels),
+                      color: foreground,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              Positioned(
+                right: 14,
+                bottom: 8,
+                child: Text(
+                  _durationLabel,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: foreground.withValues(alpha: 0.85),
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 16),
-        Text(
-          _durationLabel,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            decoration: TextDecoration.none,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          widget.willCancel ? l10n.releaseToCancel : l10n.releaseToSend,
-          style: TextStyle(
-            color: accent,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            decoration: TextDecoration.none,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _RecordingRipplePainter extends CustomPainter {
-  const _RecordingRipplePainter({
-    required this.progress,
-    required this.level,
-    required this.color,
-  });
+/// 柱状声波：中间高两边低，柱子从右往左滚。
+class _WavePainter extends CustomPainter {
+  const _WavePainter({required this.levels, required this.color});
 
-  final double progress;
-  final double level;
+  final List<double> levels;
   final Color color;
+
+  static const double _barWidth = 3;
+  static const double _gap = 2;
+  static const double _minHeight = 4;
+  static const double _maxHeight = 40;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-    final maxRadius = size.shortestSide / 2;
-    const base = 48.0;
-    for (var i = 0; i < 3; i++) {
-      final t = (progress + i / 3) % 1.0;
-      final radius = base + t * (maxRadius - base) * (0.55 + level * 0.45);
-      final opacity = ((1 - t) * (0.22 + level * 0.5)).clamp(0.0, 1.0);
-      final paint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
-        ..color = color.withValues(alpha: opacity);
-      canvas.drawCircle(center, radius, paint);
+    final total = levels.length;
+    if (total == 0) return;
+    const step = _barWidth + _gap;
+    final startX = (size.width - (step * total - _gap)) / 2;
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    for (var i = 0; i < total; i++) {
+      // 山形包络：中间 1.0，两端 0.45
+      final distance = (i - (total - 1) / 2).abs() / ((total - 1) / 2);
+      final envelope = 1 - distance * 0.55;
+      final height =
+          _minHeight + levels[i] * (_maxHeight - _minHeight) * envelope;
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: Offset(startX + i * step + _barWidth / 2, size.height / 2),
+          width: _barWidth,
+          height: height,
+        ),
+        const Radius.circular(2),
+      );
+      canvas.drawRRect(rect, paint);
     }
   }
 
   @override
-  bool shouldRepaint(_RecordingRipplePainter oldDelegate) =>
-      oldDelegate.progress != progress ||
-      oldDelegate.level != level ||
-      oldDelegate.color != color;
+  bool shouldRepaint(_WavePainter oldDelegate) {
+    if (oldDelegate.color != color) return true;
+    if (oldDelegate.levels.length != levels.length) return true;
+    for (var i = 0; i < levels.length; i++) {
+      if (oldDelegate.levels[i] != levels[i]) return true;
+    }
+    return false;
+  }
 }
 
 class _ChatAccountPicker extends StatelessWidget {

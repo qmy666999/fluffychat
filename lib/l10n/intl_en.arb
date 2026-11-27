@@ -3232,5 +3232,6 @@
   "messageResend": "Resend",
   "messageResendFailed": "Failed to resend. Please check your connection.",
   "messageResendFileMissing": "The original file is no longer available, so it cannot be resent.",
-  "momentLoadingMore": "Loading…"
+  "momentLoadingMore": "Loading…",
+  "voiceRecordingCancelled": "Recording cancelled"
 }
