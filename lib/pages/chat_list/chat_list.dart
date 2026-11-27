@@ -22,6 +22,7 @@ import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/show_scaffold_dialog.dart';
 import 'package:fluffychat/utils/show_update_snackbar.dart';
 import 'package:fluffychat/utils/wechat/hidden_rooms_service.dart';
+import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_modal_action_popup.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
@@ -158,9 +159,9 @@ class ChatListController extends State<ChatList>
       case ActiveFilter.allChats:
         return (room) => true;
       case ActiveFilter.messages:
-        return (room) => !room.isSpace && room.isDirectChat;
+        return (room) => !room.isSpace && isSinglePeerChat(room);
       case ActiveFilter.groups:
-        return (room) => !room.isSpace && !room.isDirectChat;
+        return (room) => !room.isSpace && isGroupChat(room);
       case ActiveFilter.unread:
         return (room) => room.isUnreadOrInvited;
       case ActiveFilter.tag:

@@ -3228,5 +3228,9 @@
   "notificationTestBlocked": "Notifications are blocked. Enable them in system settings.",
   "notificationDiagnostics": "Notification diagnostics",
   "notificationDiagnosticsHint": "Reproduce the issue once, then screenshot this section for the developer.",
-  "notificationDiagnosticsEmpty": "No log entries yet"
+  "notificationDiagnosticsEmpty": "No log entries yet",
+  "messageResend": "Resend",
+  "messageResendFailed": "Failed to resend. Please check your connection.",
+  "messageResendFileMissing": "The original file is no longer available, so it cannot be resent.",
+  "momentLoadingMore": "Loading…"
 }

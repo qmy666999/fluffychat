@@ -21,6 +21,7 @@ import 'package:fluffychat/utils/notification_background_handler.dart';
 import 'package:fluffychat/utils/notifications/notification_log.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/start_push_foreground_service.dart';
+import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -250,7 +251,7 @@ Future<void> _tryPushHelper(
 
   // The person object for the android message style notification
   final avatar = event.room.avatar;
-  final senderAvatar = event.room.isDirectChat
+  final senderAvatar = isSinglePeerChat(event.room)
       ? avatar
       : event.senderFromMemoryOrFallback.avatarUrl;
 
@@ -310,11 +311,11 @@ Future<void> _tryPushHelper(
                 : ByteArrayAndroidIcon(userAvatarFile),
             key: event.room.client.userID,
           ),
-          conversationTitle: event.room.isDirectChat ? null : roomName,
-          groupConversation: !event.room.isDirectChat,
+          conversationTitle: isSinglePeerChat(event.room) ? null : roomName,
+          groupConversation: !isSinglePeerChat(event.room),
           messages: [newMessage],
         ),
-    ticker: event.room.isDirectChat
+    ticker: isSinglePeerChat(event.room)
         ? body
         : l10n.senderMessage(senderName, body),
     importance: Importance.high,

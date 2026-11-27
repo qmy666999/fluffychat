@@ -2,10 +2,13 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:async';
+
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list_bottom_bar.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
 import 'package:fluffychat/utils/wechat/friend_tags_service.dart';
+import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
@@ -37,7 +40,10 @@ class _ContactsPageState extends State<ContactsPage> {
     super.didChangeDependencies();
     if (_syncStarted) return;
     _syncStarted = true;
-    FriendsSync.start(Matrix.of(context).client);
+    final client = Matrix.of(context).client;
+    FriendsSync.start(client);
+    // 进页面就重扫一次：对方刚同意、或者换设备登录时，名单要能立刻出来。
+    unawaited(FriendsSync.scanNow(client));
   }
 
   @override
@@ -196,6 +202,7 @@ class _ContactsPageState extends State<ContactsPage> {
                         ),
                         for (final friend in grouped[letter]!)
                           ListTile(
+                            key: ValueKey(friend.userId),
                             leading: Avatar(
                               mxContent: _parseUri(friend.avatarUrl),
                               name: friend.title,
@@ -245,7 +252,7 @@ class _ContactsPageState extends State<ContactsPage> {
   }
 
   bool _isGroupRoom(Room room) =>
-      room.membership == Membership.join && !room.isDirectChat && !room.isSpace;
+      room.membership == Membership.join && isGroupChat(room);
 
   Widget _entryTile({
     required IconData icon,

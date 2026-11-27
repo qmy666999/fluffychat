@@ -10,6 +10,7 @@ import 'package:fluffychat/utils/date_time_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 import 'package:fluffychat/utils/sync_status_localization.dart';
 import 'package:fluffychat/utils/verified_room_extension.dart';
+import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/presence_builder.dart';
 import 'package:go_router/go_router.dart';
@@ -31,6 +32,13 @@ class ChatAppBarTitle extends StatelessWidget {
         ),
       );
     }
+    // 两人会话一律显示对方昵称（微信语义），只有真的群聊才显示房间名。
+    final isSinglePeer = isSinglePeerChat(room);
+    final peer = isSinglePeer ? _peer(room) : null;
+    final title =
+        peer?.calcDisplayname() ??
+        room.getLocalizedDisplayname(MatrixLocals(L10n.of(context)));
+    final avatar = peer?.avatarUrl ?? room.avatar;
     return InkWell(
       hoverColor: Colors.transparent,
       splashColor: Colors.transparent,
@@ -44,13 +52,7 @@ class ChatAppBarTitle extends StatelessWidget {
         children: [
           Hero(
             tag: 'content_banner',
-            child: Avatar(
-              mxContent: room.avatar,
-              name: room.getLocalizedDisplayname(
-                MatrixLocals(L10n.of(context)),
-              ),
-              size: 32,
-            ),
+            child: Avatar(mxContent: avatar, name: title, size: 32),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -69,9 +71,7 @@ class ChatAppBarTitle extends StatelessWidget {
                       ),
                     Expanded(
                       child: Text(
-                        room.getLocalizedDisplayname(
-                          MatrixLocals(L10n.of(context)),
-                        ),
+                        title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 16),
@@ -94,9 +94,9 @@ class ChatAppBarTitle extends StatelessWidget {
                     return AnimatedSize(
                       duration: FluffyThemes.animationDuration,
                       child: hide
-                          ? room.isDirectChat
+                          ? isSinglePeer
                                 ? PresenceBuilder(
-                                    userId: room.directChatMatrixID,
+                                    userId: peer?.id ?? room.directChatMatrixID,
                                     builder: (context, presence) {
                                       final statusMessage = presence?.statusMsg
                                           ?.trim();
@@ -178,4 +178,14 @@ class ChatAppBarTitle extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 单聊里对面的那个人（拿不到资料时返回 null，调用方回落到房间名）。
+User? _peer(Room room) {
+  final peerId = singlePeerUserId(room);
+  if (peerId == null) return null;
+  for (final user in room.getParticipants()) {
+    if (user.id == peerId) return user;
+  }
+  return null;
 }

@@ -10,6 +10,7 @@ import 'package:fluffychat/pages/chat_list/unread_bubble.dart';
 import 'package:fluffychat/utils/matrix_live_kit_calls/matrix_live_kit_call.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 import 'package:fluffychat/utils/room_status_extension.dart';
+import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:fluffychat/widgets/hover_builder.dart';
 import 'package:fluffychat/widgets/typing_animation.dart';
 import 'package:material_ui/material_ui.dart';
@@ -48,14 +49,15 @@ class ChatListItem extends StatelessWidget {
     final lastEvent = room.lastEvent;
     final ownMessage = lastEvent?.senderId == room.client.userID;
     final directChatMatrixId = room.directChatMatrixID;
-    final isDirectChat = directChatMatrixId != null;
+    final isDirectChat = isSinglePeerChat(room);
     final hasNotifications = room.notificationCount > 0;
     final backgroundColor = activeChat
         ? theme.colorScheme.secondaryContainer
         : null;
-    final displayname = room.getLocalizedDisplayname(
-      MatrixLocals(L10n.of(context)),
-    );
+    // 两人会话一律显示对方昵称（微信语义），不要露出房间名。
+    final displayname =
+        (isDirectChat ? singlePeerDisplayname(room) : null) ??
+        room.getLocalizedDisplayname(MatrixLocals(L10n.of(context)));
     final filter = this.filter;
     if (filter != null && !displayname.toLowerCase().contains(filter)) {
       return const SizedBox.shrink();

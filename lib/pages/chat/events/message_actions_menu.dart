@@ -7,6 +7,7 @@ import 'dart:math' as math;
 import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/favorites/favorites_service.dart';
+import 'package:fluffychat/utils/wechat/message_retry.dart';
 import 'package:fluffychat/utils/wechat/reminder_service.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
@@ -39,6 +40,12 @@ Future<void> showMessageActionsMenu(
       event.messageType == MessageTypes.Emote;
 
   final actions = <_MessageAction>[
+    if (event.status.isError)
+      _MessageAction(
+        icon: Icons.refresh,
+        label: l10n.messageResend,
+        onTap: () => retryFailedMessage(context, event),
+      ),
     if (canRedact)
       _MessageAction(
         icon: Icons.undo_outlined,
@@ -71,11 +78,13 @@ Future<void> showMessageActionsMenu(
       label: isFavorited ? l10n.messageFavorited : l10n.messageFavorite,
       onTap: () => _toggleFavorite(context, event),
     ),
-    if (canDelete)
+    if (canDelete || event.status.isError)
       _MessageAction(
         icon: Icons.delete_outline,
         label: l10n.delete,
-        onTap: () => _confirmRedact(context, event),
+        onTap: event.status.isError
+            ? () => discardFailedMessage(context, event)
+            : () => _confirmRedact(context, event),
       ),
   ];
 

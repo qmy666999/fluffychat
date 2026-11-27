@@ -3115,8 +3115,8 @@
   "updateForceHint": "这个版本必须更新后才能继续使用",
   "keyboardMode": "键盘",
   "holdToSpeak": "按住 说话",
-  "releaseToSend": "松开 发送",
-  "releaseToCancel": "松开 取消",
+  "releaseToSend": "松开手指，发送",
+  "releaseToCancel": "松开手指，取消发送",
   "voiceRecordingTooShort": "说话时间太短",
   "chatMenuMarkUnread": "标为未读",
   "chatMenuPin": "置顶该聊天",
@@ -3228,5 +3228,9 @@
   "notificationTestBlocked": "系统通知被关掉了，请到系统设置里打开。",
   "notificationDiagnostics": "通知诊断",
   "notificationDiagnosticsHint": "复现一次消息后，把这里的内容截图给开发者，就能看出通知卡在哪一步。",
-  "notificationDiagnosticsEmpty": "暂无日志"
+  "notificationDiagnosticsEmpty": "暂无日志",
+  "messageResend": "重新发送",
+  "messageResendFailed": "重发失败，请检查网络",
+  "messageResendFileMissing": "原始文件已不在，无法重发",
+  "momentLoadingMore": "正在加载…"
 }

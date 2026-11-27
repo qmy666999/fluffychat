@@ -239,16 +239,29 @@ class FriendsService {
   Future<void> _save(FriendsData data) async {
     final userId = client.userID;
     if (userId == null) return;
-    await client.setAccountData(userId, friendsEventType, {
+    final friendsContent = <String, Object?>{
       'friends': data.friends.map((f) => f.toJson()).toList(),
       'removed': data.removedAt.entries
           .map((e) => {'user_id': e.key, 'ts': e.value})
           .toList(),
-    });
-    await client.setAccountData(userId, requestsEventType, {
+    };
+    final requestsContent = <String, Object?>{
       'incoming': data.incoming.map((r) => r.toIncomingJson()).toList(),
       'outgoing': data.outgoing.map((r) => r.toOutgoingJson()).toList(),
-    });
+    };
+    // `client.setAccountData` 只是发一个 HTTP 请求，不会更新 client.accountData，
+    // 要等下一次 /sync 才会变。这里立刻把本地缓存也改掉，否则紧接着的 load()
+    // 读到的是旧快照，会把刚写入的改动覆盖回去（「同意好友后通讯录不显示」）。
+    client.accountData[friendsEventType] = BasicEvent(
+      type: friendsEventType,
+      content: friendsContent,
+    );
+    client.accountData[requestsEventType] = BasicEvent(
+      type: requestsEventType,
+      content: requestsContent,
+    );
+    await client.setAccountData(userId, friendsEventType, friendsContent);
+    await client.setAccountData(userId, requestsEventType, requestsContent);
   }
 
   Future<void> save(FriendsData data) => _save(data);
@@ -408,15 +421,24 @@ class FriendsService {
     final me = client.userID!;
     final roomId = request.roomId ?? await openDirectChat(request.peer);
 
-    await addFriend(
-      FriendEntry(
-        userId: request.peer,
-        displayName: request.peerName ?? '',
-        avatarUrl: request.avatarUrl,
-      ),
-    );
-
+    // 只读一次、只写一次：中间再 load() 会读到还没同步回来的旧快照，
+    // 把刚加进名单的好友覆盖掉。
     final data = load();
+    data.removedAt.remove(request.peer);
+    final existing = data.friend(request.peer);
+    if (existing != null) {
+      existing
+        ..displayName = request.peerName ?? existing.displayName
+        ..avatarUrl = request.avatarUrl ?? existing.avatarUrl;
+    } else {
+      data.friends.add(
+        FriendEntry(
+          userId: request.peer,
+          displayName: request.peerName ?? '',
+          avatarUrl: request.avatarUrl,
+        ),
+      );
+    }
     for (final r in data.incoming) {
       if (r.peer == request.peer) {
         r.status = FriendRequestStatus.accepted;

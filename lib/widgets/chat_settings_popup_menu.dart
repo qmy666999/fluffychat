@@ -7,6 +7,7 @@ import 'dart:async';
 
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/voip/call_actions.dart';
+import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
 import 'package:go_router/go_router.dart';
@@ -176,7 +177,7 @@ class ChatSettingsPopupMenuState extends State<ChatSettingsPopupMenu> {
   /// 只有两个成员的私聊才显示通话入口（这一版不做群组通话）。
   bool get _canStartCall =>
       widget.room.membership == Membership.join &&
-      widget.room.summary.mJoinedMemberCount == 2;
+      isSinglePeerChat(widget.room);
 
   Future<void> _startCall(CallType type) =>
       startChatCall(context, widget.room, type);

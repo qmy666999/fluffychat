@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
@@ -11,7 +12,7 @@ import 'package:matrix/matrix.dart';
 
 /// 通讯录 → 群聊：我加入的所有群。
 bool _isGroupRoom(Room room) =>
-    room.membership == Membership.join && !room.isDirectChat && !room.isSpace;
+    room.membership == Membership.join && isGroupChat(room);
 
 class GroupsPage extends StatelessWidget {
   const GroupsPage({super.key});

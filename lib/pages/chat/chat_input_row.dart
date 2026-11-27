@@ -154,12 +154,18 @@ class _ChatInputRowState extends State<ChatInputRow> {
                   ),
             if (recording.isRecording)
               Positioned(
-                left: 12,
-                right: 12,
-                bottom: ChatInputRow.height + 8,
-                child: _RecordingOverlay(
-                  recording: recording,
-                  willCancel: _willCancel,
+                left: 0,
+                right: 0,
+                // 浮层要出现在屏幕中间（微信的位置），所以按屏幕高度反推底部距离；
+                // Stack 本身只有输入栏那么高，用负/clipBehavior: none 让它画到外面去。
+                bottom: MediaQuery.sizeOf(context).height / 2 - 122,
+                child: IgnorePointer(
+                  child: Center(
+                    child: _RecordingOverlay(
+                      recording: recording,
+                      willCancel: _willCancel,
+                    ),
+                  ),
                 ),
               ),
           ],
@@ -439,89 +445,153 @@ class _ChatInputRowState extends State<ChatInputRow> {
 }
 
 /// 录音时浮在输入栏上方的小面板：声波 + 时长 + 松手提示。
-class _RecordingOverlay extends StatelessWidget {
+class _RecordingOverlay extends StatefulWidget {
   const _RecordingOverlay({required this.recording, required this.willCancel});
 
   final RecordingViewModelState recording;
   final bool willCancel;
 
-  static const int _bars = 24;
+  @override
+  State<_RecordingOverlay> createState() => _RecordingOverlayState();
+}
+
+/// 微信式录音浮层：屏幕中间一个半透明黑圆，周围是随音量起伏的波纹，
+/// 圆下面是时长与「松开手指，发送」，上滑取消时整体变红。
+class _RecordingOverlayState extends State<_RecordingOverlay>
+    with SingleTickerProviderStateMixin {
+  static const int _maxAmplitude = 200;
+
+  late final AnimationController _ripple;
+
+  @override
+  void initState() {
+    super.initState();
+    _ripple = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ripple.dispose();
+    super.dispose();
+  }
+
+  /// 0..1，取最近一次振幅。
+  double get _level {
+    final amplitudes = widget.recording.amplitudeTimeline;
+    if (amplitudes.isEmpty) return 0;
+    final value = amplitudes.last.clamp(0, _maxAmplitude);
+    return value / _maxAmplitude;
+  }
+
+  String get _durationLabel {
+    final duration = widget.recording.duration;
+    final minutes = duration.inMinutes;
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = L10n.of(context);
     final theme = Theme.of(context);
-    final duration = recording.duration;
-    final amplitudes = recording.amplitudeTimeline;
-    final recent = amplitudes.length > _bars
-        ? amplitudes.sublist(amplitudes.length - _bars)
-        : amplitudes;
-    final accent = willCancel ? theme.colorScheme.error : Colors.white;
+    final accent = widget.willCancel ? theme.colorScheme.error : Colors.white;
+    final level = _level;
 
-    return Material(
-      color: Colors.black.withValues(alpha: 0.78),
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              height: 36,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  for (var i = 0; i < _bars; i++)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: Container(
-                        width: 3,
-                        height: _barHeight(i, recent),
-                        decoration: BoxDecoration(
-                          color: accent,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                ],
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 180,
+          height: 180,
+          child: AnimatedBuilder(
+            animation: _ripple,
+            builder: (context, child) => CustomPaint(
+              painter: _RecordingRipplePainter(
+                progress: _ripple.value,
+                level: level,
+                color: accent,
+              ),
+              child: child,
+            ),
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.72),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  widget.willCancel ? Icons.close : Icons.mic,
+                  color: accent,
+                  size: 36,
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _durationLabel(duration),
-                  style: TextStyle(color: Colors.white, fontSize: 13),
-                ),
-                Text(
-                  willCancel ? l10n.releaseToCancel : l10n.releaseToSend,
-                  style: TextStyle(
-                    color: accent,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(height: 16),
+        Text(
+          _durationLabel,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            decoration: TextDecoration.none,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          widget.willCancel ? l10n.releaseToCancel : l10n.releaseToSend,
+          style: TextStyle(
+            color: accent,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            decoration: TextDecoration.none,
+          ),
+        ),
+      ],
     );
   }
+}
 
-  double _barHeight(int index, List<double> amplitudes) {
-    if (index >= amplitudes.length) return 4;
-    final value = amplitudes[index].clamp(0, 200) / 200;
-    return 4 + value * 32;
+class _RecordingRipplePainter extends CustomPainter {
+  const _RecordingRipplePainter({
+    required this.progress,
+    required this.level,
+    required this.color,
+  });
+
+  final double progress;
+  final double level;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final maxRadius = size.shortestSide / 2;
+    const base = 48.0;
+    for (var i = 0; i < 3; i++) {
+      final t = (progress + i / 3) % 1.0;
+      final radius = base + t * (maxRadius - base) * (0.55 + level * 0.45);
+      final opacity = ((1 - t) * (0.22 + level * 0.5)).clamp(0.0, 1.0);
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..color = color.withValues(alpha: opacity);
+      canvas.drawCircle(center, radius, paint);
+    }
   }
 
-  String _durationLabel(Duration duration) {
-    final minutes = duration.inMinutes.toString().padLeft(2, '0');
-    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
-  }
+  @override
+  bool shouldRepaint(_RecordingRipplePainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.level != level ||
+      oldDelegate.color != color;
 }
 
 class _ChatAccountPicker extends StatelessWidget {

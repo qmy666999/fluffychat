@@ -5,6 +5,7 @@ import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat/chat.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/voip/call_actions.dart';
+import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
@@ -34,9 +35,7 @@ Future<void> showChatAddMenu(
   ChatController controller,
 ) async {
   final room = controller.room;
-  final canCall =
-      room.membership == Membership.join &&
-      room.summary.mJoinedMemberCount == 2;
+  final canCall = room.membership == Membership.join && isSinglePeerChat(room);
   final entries = _buildEntries(context, controller, canCall);
   final entry = await showModalBottomSheet<_AddMenuEntry>(
     context: context,

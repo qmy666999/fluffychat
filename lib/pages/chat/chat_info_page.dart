@@ -4,6 +4,7 @@
 
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
+import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
@@ -216,7 +217,7 @@ class _ChatInfoPageState extends State<ChatInfoPage> {
       body: StreamBuilder(
         stream: _client.onSync.stream,
         builder: (context, _) {
-          final isDirect = room.isDirectChat;
+          final isDirect = isSinglePeerChat(room);
           final muted = room.pushRuleState != PushRuleState.notify;
           return ListView(
             children: [

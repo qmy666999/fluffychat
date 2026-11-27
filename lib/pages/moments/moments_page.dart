@@ -17,6 +17,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
+import 'moment_gallery_page.dart';
 import 'moment_image.dart';
 import 'moment_model.dart';
 
@@ -97,9 +98,15 @@ class _MomentsPageState extends State<MomentsPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
+        // 刷新失败不要把已有动态清掉，只提示。
         _error = e.toString();
         _loading = false;
       });
+      if (pull) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(L10n.of(context).refreshFailed)));
+      }
     }
   }
 
@@ -259,13 +266,15 @@ class _MomentsPageState extends State<MomentsPage> {
                   // 列表是「最新在上、更旧在下」，所以触底才加载更早的动态。
                   final metrics = notification.metrics;
                   if (metrics.axis != Axis.vertical) return false;
-                  if (metrics.pixels >= metrics.maxScrollExtent - 400) {
+                  if (metrics.pixels >= metrics.maxScrollExtent - 200) {
                     _loadMore();
                   }
                   return false;
                 },
                 child: CustomScrollView(
                   controller: _scroll,
+                  // 内容不满一屏时也要能下拉刷新
+                  physics: const AlwaysScrollableScrollPhysics(),
                   slivers: [
                     SliverToBoxAdapter(child: _buildCover(client)),
                     if (_error != null)
@@ -309,15 +318,28 @@ class _MomentsPageState extends State<MomentsPage> {
                         ),
                       ),
                     if (_loadingMore)
-                      const SliverToBoxAdapter(
+                      SliverToBoxAdapter(
                         child: Padding(
-                          padding: EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(16),
                           child: Center(
-                            child: SizedBox.square(
-                              dimension: 20,
-                              child: CircularProgressIndicator.adaptive(
-                                strokeWidth: 2,
-                              ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox.square(
+                                  dimension: 16,
+                                  child: CircularProgressIndicator.adaptive(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  l10n.momentLoadingMore,
+                                  style: TextStyle(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -465,6 +487,7 @@ class _MomentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final author = name(data.senderId);
+    final imageUris = data.images.map(Uri.parse).toList();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
@@ -494,15 +517,29 @@ class _MomentCard extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(data.text),
                   ),
-                if (data.images.length == 1)
+                if (imageUris.length == 1)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: _SingleImage(uri: Uri.tryParse(data.images.first)),
+                    child: _SingleImage(
+                      uri: imageUris.first,
+                      onTap: () => showMomentGallery(
+                        context,
+                        images: imageUris,
+                        index: 0,
+                      ),
+                    ),
                   )
-                else if (data.images.isNotEmpty)
+                else if (imageUris.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: _ImageGrid(images: data.images),
+                    child: _ImageGrid(
+                      images: imageUris,
+                      onTap: (index) => showMomentGallery(
+                        context,
+                        images: imageUris,
+                        index: index,
+                      ),
+                    ),
                   ),
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
@@ -597,30 +634,35 @@ class _MomentCard extends StatelessWidget {
 }
 
 class _SingleImage extends StatelessWidget {
-  final Uri? uri;
+  final Uri uri;
+  final VoidCallback onTap;
 
-  const _SingleImage({required this.uri});
+  const _SingleImage({required this.uri, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     // 微信单图大约占正文宽度 60%，按 4:3 显示。
     final width = MediaQuery.sizeOf(context).width * 0.6;
-    return SizedBox(
-      width: width,
-      height: width * 0.75,
-      child: MomentImage(
-        uri: uri,
-        fit: BoxFit.cover,
-        borderRadius: BorderRadius.circular(4),
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: width,
+        height: width * 0.75,
+        child: MomentImage(
+          uri: uri,
+          fit: BoxFit.cover,
+          borderRadius: BorderRadius.circular(4),
+        ),
       ),
     );
   }
 }
 
 class _ImageGrid extends StatelessWidget {
-  final List<String> images;
+  final List<Uri> images;
+  final void Function(int index) onTap;
 
-  const _ImageGrid({required this.images});
+  const _ImageGrid({required this.images, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -635,10 +677,13 @@ class _ImageGrid extends StatelessWidget {
         mainAxisSpacing: 4,
       ),
       itemCount: shown.length,
-      itemBuilder: (context, i) => MomentImage(
-        uri: Uri.tryParse(shown[i]),
-        fit: BoxFit.cover,
-        borderRadius: BorderRadius.circular(4),
+      itemBuilder: (context, i) => GestureDetector(
+        onTap: () => onTap(i),
+        child: MomentImage(
+          uri: shown[i],
+          fit: BoxFit.cover,
+          borderRadius: BorderRadius.circular(4),
+        ),
       ),
     );
   }
