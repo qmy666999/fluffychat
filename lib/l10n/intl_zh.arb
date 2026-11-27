@@ -3305,4 +3305,53 @@
   "toastMuteOn": "已开启免打扰"
 ,
   "toastMuteOff": "已关闭免打扰"
+,
+  "myStickers": "我的表情"
+,
+  "recentStickers": "最近使用"
+,
+  "stickerCount": "共 {count}",
+  "@stickerCount": {"placeholders": {"count": {"type": "String"}}}
+,
+  "stickerSearchHint": "搜索表情"
+,
+  "stickerSearchEmpty": "没有找到相关表情"
+,
+  "stickerEmpty": "还没有表情，点下面的 ＋ 添加"
+,
+  "stickerAdd": "添加表情"
+,
+  "stickerManage": "管理表情"
+,
+  "stickerManageTitle": "管理表情"
+,
+  "stickerMoveToFront": "移到最前"
+,
+  "stickerMovedToFront": "已移到最前"
+,
+  "stickerDeleted": "已删除表情"
+,
+  "stickerAddedCount": "已添加 {count} 个表情",
+  "@stickerAddedCount": {"placeholders": {"count": {"type": "String"}}}
+,
+  "stickerAlreadyAdded": "已经添加过了"
+,
+  "stickerAnimatedTooLarge": "动图不能超过 1MB"
+,
+  "stickerAnimatedTooBigDims": "动图不能超过 1024×1024"
+,
+  "stickerUnsupportedImage": "不支持这个图片格式"
+,
+  "stickerUploadFailed": "表情上传失败，请检查网络"
+,
+  "addToStickers": "添加到表情"
+,
+  "stickerSelectAll": "全选"
+,
+  "stickerDeleteSelected": "删除所选"
+,
+  "stickerDeletedCount": "已删除 {count} 个表情",
+  "@stickerDeletedCount": {"placeholders": {"count": {"type": "String"}}}
+,
+  "stickerDragHint": "长按右侧手柄拖动排序"
 }

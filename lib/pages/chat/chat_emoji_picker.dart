@@ -6,8 +6,10 @@
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
-import 'package:fluffychat/pages/chat/sticker_picker_dialog.dart';
+import 'package:fluffychat/pages/chat/sticker_panel.dart';
 import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
+import 'package:fluffychat/utils/stickers/sticker_store.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
@@ -74,25 +76,25 @@ class ChatEmojiPicker extends StatelessWidget {
                             ),
                           ),
                         ),
-                        StickerPickerDialog(
+                        StickerPanel(
                           room: controller.room,
-                          onSelected: (sticker) async {
+                          onSend: (item) async {
                             final proceed = await showTrustUserInRoomDialog(
                               context,
                               controller.room,
                             );
                             if (!proceed) return;
-                            controller.room.sendEvent(
-                              {
-                                'body': sticker.body,
-                                'info': sticker.info ?? {},
-                                'url': sticker.url.toString(),
-                              },
+                            await controller.room.sendEvent(
+                              item.toStickerContent(),
                               type: EventTypes.Sticker,
                               threadRootEventId: controller.activeThreadId,
                               threadLastEventId: controller.threadLastEventId,
                             );
                             controller.hideEmojiPicker();
+                          },
+                          onManage: () async {
+                            await context.push('/stickers/manage');
+                            StickerStore.revision.value++;
                           },
                         ),
                       ],

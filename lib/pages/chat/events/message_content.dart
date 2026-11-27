@@ -58,8 +58,9 @@ class MessageContent extends StatelessWidget {
           case MessageTypes.Image:
           case MessageTypes.Sticker:
             if (event.redacted) continue textmessage;
+            // 自定义表情按微信的样子放大到屏宽的 35%（最大不超过 240）。
             final maxSize = event.messageType == MessageTypes.Sticker
-                ? 128.0
+                ? (MediaQuery.sizeOf(context).width * 0.35).clamp(96.0, 240.0)
                 : 256.0;
             final w = event.content
                 .tryGetMap<String, Object?>('info')

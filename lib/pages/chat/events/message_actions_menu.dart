@@ -8,6 +8,7 @@ import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/config/m3_motion.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/favorites/favorites_service.dart';
+import 'package:fluffychat/utils/stickers/sticker_service.dart';
 import 'package:fluffychat/utils/wechat/message_retry.dart';
 import 'package:fluffychat/utils/wechat/reminder_service.dart';
 import 'package:fluffychat/widgets/animations/message_shatter.dart';
@@ -69,6 +70,12 @@ Future<void> showMessageActionsMenu(
         icon: Icons.copy_outlined,
         label: l10n.copy,
         onTap: () => _copy(context, event),
+      ),
+    if (event.messageType == MessageTypes.Sticker)
+      _MessageAction(
+        icon: Icons.add_reaction_outlined,
+        label: l10n.addToStickers,
+        onTap: () => addStickerFromEvent(context, event),
       ),
     _MessageAction(
       icon: Icons.checklist_outlined,

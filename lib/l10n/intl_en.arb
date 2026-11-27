@@ -3305,4 +3305,53 @@
   "toastMuteOn": "Muted"
 ,
   "toastMuteOff": "Unmuted"
+,
+  "myStickers": "My stickers"
+,
+  "recentStickers": "Recent"
+,
+  "stickerCount": "Total {count}",
+  "@stickerCount": {"placeholders": {"count": {"type": "String"}}}
+,
+  "stickerSearchHint": "Search stickers"
+,
+  "stickerSearchEmpty": "No stickers found"
+,
+  "stickerEmpty": "No stickers yet. Tap ＋ below to add."
+,
+  "stickerAdd": "Add stickers"
+,
+  "stickerManage": "Manage stickers"
+,
+  "stickerManageTitle": "Manage stickers"
+,
+  "stickerMoveToFront": "Move to front"
+,
+  "stickerMovedToFront": "Moved to front"
+,
+  "stickerDeleted": "Sticker deleted"
+,
+  "stickerAddedCount": "Added {count} stickers",
+  "@stickerAddedCount": {"placeholders": {"count": {"type": "String"}}}
+,
+  "stickerAlreadyAdded": "Already added"
+,
+  "stickerAnimatedTooLarge": "Animated stickers must be under 1MB"
+,
+  "stickerAnimatedTooBigDims": "Animated stickers must be at most 1024×1024"
+,
+  "stickerUnsupportedImage": "Unsupported image format"
+,
+  "stickerUploadFailed": "Could not upload the sticker. Check your connection."
+,
+  "addToStickers": "Add to stickers"
+,
+  "stickerSelectAll": "Select all"
+,
+  "stickerDeleteSelected": "Delete selected"
+,
+  "stickerDeletedCount": "Deleted {count} stickers",
+  "@stickerDeletedCount": {"placeholders": {"count": {"type": "String"}}}
+,
+  "stickerDragHint": "Drag the handle to reorder"
 }

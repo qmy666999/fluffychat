@@ -52,6 +52,7 @@ import 'package:fluffychat/pages/settings_password/settings_password.dart';
 import 'package:fluffychat/pages/settings_security/settings_security.dart';
 import 'package:fluffychat/pages/settings_style/settings_style.dart';
 import 'package:fluffychat/pages/sign_in/sign_in_page.dart';
+import 'package:fluffychat/pages/stickers/sticker_manage_page.dart';
 import 'package:fluffychat/pages/voip/voip_call_page.dart';
 import 'package:fluffychat/widgets/config_viewer.dart';
 import 'package:fluffychat/widgets/layouts/empty_page.dart';
@@ -179,6 +180,12 @@ abstract class AppRoutes {
               defaultPageBuilder(context, state, const FavoritesPage()),
         ),
       ],
+    ),
+    // 自定义表情管理页（从表情面板的 ⚙ 进入）。
+    GoRoute(
+      path: '/stickers/manage',
+      pageBuilder: (context, state) =>
+          defaultPageBuilder(context, state, const StickerManagePage()),
     ),
     // 1 对 1 语音/视频通话：全屏独立路由。
     GoRoute(
