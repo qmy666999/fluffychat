@@ -48,10 +48,9 @@ class _ChatInputRowState extends State<ChatInputRow> {
   /// 上滑是否超过取消阈值
   bool _willCancel = false;
 
-  /// 取消阈值：向上滑超过这个距离、并且往左滑出 [_cancelSideThreshold]，
-  /// 才算进入左上角的「取消」区（微信是斜着往左上丢）
-  static const double _cancelThreshold = 80;
-  static const double _cancelSideThreshold = 60;
+  /// 取消阈值：只要往上滑超过这个距离就进入取消态（微信只认上下，
+  /// 左右划多远都不影响）
+  static const double _cancelThreshold = 60;
 
   /// 录音上限，到点自动发送
   static const Duration _maxDuration = Duration(seconds: 60);
@@ -59,6 +58,9 @@ class _ChatInputRowState extends State<ChatInputRow> {
   int? _pointer;
   Offset? _downPosition;
   Timer? _maxDurationTimer;
+
+  /// 输入栏的位置锚点：录音浮层要贴在它正上方 16dp，而不是按屏幕高度估
+  final GlobalKey _composerKey = GlobalKey();
 
   /// 录音浮层挂在根 Overlay 上（输入栏外面，见 recording_bubble.dart 的注释）
   OverlayEntry? _overlayEntry;
@@ -112,32 +114,46 @@ class _ChatInputRowState extends State<ChatInputRow> {
   void _showRecordingOverlay(RecordingViewModelState recording) {
     _hideRecordingOverlay(immediate: true);
     final overlay = Overlay.of(context, rootOverlay: true);
+    if (_composerKey.currentContext?.findRenderObject() is! RenderBox) {
+      debugPrint('[record] 拿不到输入栏位置，浮层不显示');
+      return;
+    }
     _overlayVisible.value = true;
     _cancelNotifier.value = _willCancel;
     _overlayEntry = OverlayEntry(
-      builder: (overlayContext) => Positioned(
-        top: MediaQuery.sizeOf(overlayContext).height * 0.28,
-        left: 0,
-        right: 0,
-        child: IgnorePointer(
-          child: Center(
-            child: ValueListenableBuilder<bool>(
-              valueListenable: _overlayVisible,
-              builder: (context, visible, child) {
-                return ValueListenableBuilder<bool>(
-                  valueListenable: _cancelNotifier,
-                  builder: (context, cancelling, child) => RecordingBubble(
-                    level: () => _currentLevel(recording),
-                    duration: () => recording.duration,
-                    cancelling: cancelling,
-                    visible: visible,
-                  ),
-                );
-              },
+      builder: (overlayContext) {
+        // 每次 build 重算：键盘弹起/收起时输入栏会动，浮层跟着动
+        final anchor = _composerKey.currentContext?.findRenderObject();
+        final screenHeight = MediaQuery.sizeOf(overlayContext).height;
+        final composerTop = anchor is RenderBox
+            ? anchor.localToGlobal(Offset.zero).dy
+            : screenHeight - 96;
+        // 浮层底部 = 输入栏顶部再往上 16dp
+        final bottom = screenHeight - composerTop + 16;
+        return Positioned(
+          left: 0,
+          right: 0,
+          bottom: bottom < 0 ? 0 : bottom,
+          child: IgnorePointer(
+            child: Center(
+              child: ValueListenableBuilder<bool>(
+                valueListenable: _overlayVisible,
+                builder: (context, visible, child) {
+                  return ValueListenableBuilder<bool>(
+                    valueListenable: _cancelNotifier,
+                    builder: (context, cancelling, child) => RecordingBubble(
+                      level: () => _currentLevel(recording),
+                      duration: () => recording.duration,
+                      cancelling: cancelling,
+                      visible: visible,
+                    ),
+                  );
+                },
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
     overlay.insert(_overlayEntry!);
     debugPrint('[record] 浮层已插入 overlay');
@@ -191,10 +207,9 @@ class _ChatInputRowState extends State<ChatInputRow> {
     if (event.pointer != _pointer) return;
     final start = _downPosition;
     if (start == null) return;
-    // 用「相对按下位置的偏移」判断，不写死坐标：往上 80dp 且往左 60dp 才算取消
+    // 只认上下：往上滑超过阈值就取消，左右划多远都不算
     final dy = start.dy - event.position.dy;
-    final dx = start.dx - event.position.dx;
-    final willCancel = dy > _cancelThreshold && dx > _cancelSideThreshold;
+    final willCancel = dy > _cancelThreshold;
     if (willCancel != _willCancel) {
       setState(() => _willCancel = willCancel);
       _cancelNotifier.value = willCancel;
@@ -294,6 +309,7 @@ class _ChatInputRowState extends State<ChatInputRow> {
     final showSendButton = !_voiceMode && textMessageOnly;
 
     return Padding(
+      key: _composerKey,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,

@@ -3233,5 +3233,7 @@
   "messageResendFailed": "Failed to resend. Please check your connection.",
   "messageResendFileMissing": "The original file is no longer available, so it cannot be resent.",
   "momentLoadingMore": "Loading…",
-  "voiceRecordingCancelled": "Recording cancelled"
+  "voiceRecordingCancelled": "Recording cancelled",
+  "showRedactedMessages": "Show redaction notices",
+  "showRedactedMessagesHint": "When off, redacted messages disappear from the chat completely"
 }

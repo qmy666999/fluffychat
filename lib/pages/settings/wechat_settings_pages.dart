@@ -316,6 +316,15 @@ class _SettingsChatPageState extends State<SettingsChatPage> {
             WechatPrefs.setChatEnterToSend(value);
           }),
         ),
+        SwitchListTile.adaptive(
+          // 关掉「显示撤回提示」= 撤回后彻底消失（微信默认行为）
+          title: Text(l10n.showRedactedMessages),
+          subtitle: Text(l10n.showRedactedMessagesHint),
+          value: !AppSettings.hideRedactedEvents.value,
+          onChanged: (value) => setState(() {
+            AppSettings.hideRedactedEvents.setItem(!value);
+          }),
+        ),
         ListTile(
           title: Text(l10n.chatBackupMigrate),
           subtitle: Text(l10n.featureComingSoon),

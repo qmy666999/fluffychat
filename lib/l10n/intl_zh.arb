@@ -3233,5 +3233,7 @@
   "messageResendFailed": "重发失败，请检查网络",
   "messageResendFileMissing": "原始文件已不在，无法重发",
   "momentLoadingMore": "正在加载…",
-  "voiceRecordingCancelled": "已取消"
+  "voiceRecordingCancelled": "已取消",
+  "showRedactedMessages": "显示撤回提示",
+  "showRedactedMessagesHint": "关闭后，撤回的消息会从聊天里彻底消失"
 }

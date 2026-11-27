@@ -10,6 +10,7 @@ import 'package:fluffychat/pages/chat_list/unread_bubble.dart';
 import 'package:fluffychat/utils/matrix_live_kit_calls/matrix_live_kit_call.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 import 'package:fluffychat/utils/room_status_extension.dart';
+import 'package:fluffychat/utils/wechat/redaction_preview.dart';
 import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:fluffychat/widgets/hover_builder.dart';
 import 'package:fluffychat/widgets/typing_animation.dart';
@@ -63,9 +64,6 @@ class ChatListItem extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final needLastEventSender =
-        lastEvent != null &&
-        room.getState(EventTypes.RoomMember, lastEvent.senderId) == null;
     final space = this.space;
 
     return Padding(
@@ -318,60 +316,10 @@ class ChatListItem extends StatelessWidget {
                             maxLines: 1,
                             softWrap: false,
                           )
-                        : FutureBuilder(
-                            key: ValueKey(
-                              '${lastEvent?.eventId}_${lastEvent?.type}_${lastEvent?.redacted}',
-                            ),
-                            future: needLastEventSender
-                                ? lastEvent.fetchSenderUser()
-                                : null,
-                            builder: (context, snapshot) {
-                              var body = lastEvent?.calcLocalizedBody(
-                                MatrixLocals(L10n.of(context)),
-                                hideReply: true,
-                                hideEdit: true,
-                                plaintextBody: true,
-                                removeMarkdown: true,
-                              );
-                              if (lastEvent != null &&
-                                  body != null &&
-                                  (!isDirectChat ||
-                                      directChatMatrixId !=
-                                          room.lastEvent?.senderId)) {
-                                body = L10n.of(context).senderMessage(
-                                  lastEvent.senderId == room.client.userID
-                                      ? L10n.of(context).you
-                                      : snapshot.data?.calcDisplayname() ??
-                                            lastEvent.senderFromMemoryOrFallback
-                                                .calcDisplayname(),
-                                  body,
-                                );
-                              }
-                              return Text(
-                                room.membership == Membership.invite
-                                    ? room
-                                              .getState(
-                                                EventTypes.RoomMember,
-                                                room.client.userID!,
-                                              )
-                                              ?.content
-                                              .tryGet<String>('reason') ??
-                                          (isDirectChat
-                                              ? L10n.of(context).newChatRequest
-                                              : L10n.of(
-                                                  context,
-                                                ).inviteGroupChat)
-                                    : body ?? L10n.of(context).noMessagesYet,
-                                softWrap: false,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  decoration: room.lastEvent?.redacted == true
-                                      ? TextDecoration.lineThrough
-                                      : null,
-                                ),
-                              );
-                            },
+                        : _RoomPreview(
+                            room: room,
+                            isDirectChat: isDirectChat,
+                            directChatMatrixId: directChatMatrixId,
                           ),
                   ),
                   const SizedBox(width: 8),
@@ -391,6 +339,147 @@ class ChatListItem extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 会话列表里的最后一条消息预览。
+///
+/// 撤回的消息在聊天里彻底消失，所以预览也要回退到上一条可见消息：
+/// [Room.lastEvent] 仍然指向那个被撤回的事件。
+class _RoomPreview extends StatefulWidget {
+  const _RoomPreview({
+    required this.room,
+    required this.isDirectChat,
+    required this.directChatMatrixId,
+  });
+
+  final Room room;
+  final bool isDirectChat;
+  final String? directChatMatrixId;
+
+  @override
+  State<_RoomPreview> createState() => _RoomPreviewState();
+}
+
+class _RoomPreviewState extends State<_RoomPreview> {
+  Event? _event;
+  String? _senderName;
+  String _signature = '';
+  bool _loading = false;
+
+  String get _currentSignature => _signatureOf(widget.room);
+
+  static String _signatureOf(Room room) {
+    final lastEvent = room.lastEvent;
+    return '${room.id}|${lastEvent?.eventId}|${lastEvent?.type}|'
+        '${lastEvent?.redacted}|${room.membership}';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _signature = _currentSignature;
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(covariant _RoomPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_signatureOf(widget.room) != _signatureOf(oldWidget.room)) {
+      _resolve();
+    }
+  }
+
+  Future<void> _resolve() async {
+    final room = widget.room;
+    final lastEvent = room.lastEvent;
+    _signature = _signatureOf(room);
+    if (RedactionPreviewCache.isHiddenPreview(lastEvent)) {
+      setState(() {
+        _event = null;
+        _senderName = null;
+        _loading = true;
+      });
+      RedactionPreviewCache.invalidate(room.id);
+      final previous = await RedactionPreviewCache.previous(room);
+      if (!mounted || _signature != _currentSignature) return;
+      setState(() {
+        _event = previous;
+        _loading = false;
+      });
+      await _loadSender(previous);
+      return;
+    }
+    setState(() {
+      _event = lastEvent;
+      _senderName = null;
+      _loading = false;
+    });
+    await _loadSender(lastEvent);
+  }
+
+  Future<void> _loadSender(Event? event) async {
+    if (event == null) return;
+    if (widget.room.getState(EventTypes.RoomMember, event.senderId) != null) {
+      return;
+    }
+    try {
+      final user = await event.fetchSenderUser();
+      if (!mounted || _event?.eventId != event.eventId) return;
+      setState(() => _senderName = user?.calcDisplayname());
+    } catch (_) {
+      // 拿不到就用事件里自带的昵称
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
+    final room = widget.room;
+    if (room.membership == Membership.invite) {
+      final reason = room
+          .getState(EventTypes.RoomMember, room.client.userID!)
+          ?.content
+          .tryGet<String>('reason');
+      return Text(
+        reason ??
+            (widget.isDirectChat ? l10n.newChatRequest : l10n.inviteGroupChat),
+        softWrap: false,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+    if (_loading) return const SizedBox(height: 20);
+    final event = _event;
+    if (event == null) {
+      return Text(
+        l10n.noMessagesYet,
+        softWrap: false,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+    var body = event.calcLocalizedBody(
+      MatrixLocals(l10n),
+      hideReply: true,
+      hideEdit: true,
+      plaintextBody: true,
+      removeMarkdown: true,
+    );
+    if (!widget.isDirectChat || widget.directChatMatrixId != event.senderId) {
+      body = l10n.senderMessage(
+        event.senderId == room.client.userID
+            ? l10n.you
+            : _senderName ?? event.senderFromMemoryOrFallback.calcDisplayname(),
+        body,
+      );
+    }
+    return Text(
+      body,
+      softWrap: false,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }

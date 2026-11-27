@@ -37,7 +37,9 @@ enum AppSettings<T> {
   ),
   renderHtml<bool>('chat.fluffy.renderHtml', true),
   fontSizeFactor<double>('chat.fluffy.font_size_factor', 1.0),
-  hideRedactedEvents<bool>('chat.fluffy.hideRedactedEvents', false),
+  // 微信语义：撤回的消息在聊天里彻底消失（不留「该消息已被删除」占位）。
+  // 想要看到撤回提示的，可以在 设置 → 聊天 → 显示撤回提示 里打开。
+  hideRedactedEvents<bool>('chat.fluffy.hideRedactedEvents', true),
   hideUnknownEvents<bool>('chat.fluffy.hideUnknownEvents', true),
   autoplayImages<bool>('chat.fluffy.autoplay_images', true),
   sendTypingNotifications<bool>('chat.fluffy.send_typing_notifications', true),

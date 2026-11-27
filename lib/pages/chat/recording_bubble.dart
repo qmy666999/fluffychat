@@ -55,7 +55,7 @@ class _RecordingBubbleState extends State<RecordingBubble>
     super.initState();
     _appear = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 180),
       value: widget.visible ? 0 : 1,
     );
     if (widget.visible) _appear.forward();
@@ -127,19 +127,23 @@ class _RecordingBubbleState extends State<RecordingBubble>
     final foreground = widget.cancelling
         ? colorScheme.onError
         : colorScheme.onPrimary;
-    final width = math.min(260.0, MediaQuery.sizeOf(context).width * 0.7);
+    final width = math.min(MediaQuery.sizeOf(context).width * 0.75, 300.0);
 
-    return ScaleTransition(
-      scale: Tween<double>(
-        begin: 0.8,
-        end: 1,
-      ).animate(CurvedAnimation(parent: _appear, curve: Curves.easeOutCubic)),
-      child: FadeTransition(
-        opacity: _appear,
+    return FadeTransition(
+      opacity: _appear,
+      child: AnimatedBuilder(
+        animation: _appear,
+        builder: (context, child) {
+          // 从下方 12dp 上浮出现
+          return Transform.translate(
+            offset: Offset(0, (1 - _appear.value) * 12),
+            child: child,
+          );
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           width: width,
-          height: 90,
+          height: 72,
           decoration: BoxDecoration(
             color: background,
             borderRadius: BorderRadius.circular(24),
@@ -155,7 +159,7 @@ class _RecordingBubbleState extends State<RecordingBubble>
             children: [
               Positioned.fill(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 30),
+                  padding: const EdgeInsets.fromLTRB(14, 6, 14, 24),
                   child: CustomPaint(
                     painter: _WavePainter(
                       levels: List<double>.of(_levels),
@@ -166,7 +170,7 @@ class _RecordingBubbleState extends State<RecordingBubble>
               ),
               Positioned(
                 right: 14,
-                bottom: 8,
+                bottom: 6,
                 child: Text(
                   _durationLabel,
                   style: TextStyle(
