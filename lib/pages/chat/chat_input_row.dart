@@ -11,6 +11,7 @@ import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat/recording_view_model.dart';
 import 'package:fluffychat/utils/other_party_can_receive.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
+import 'package:fluffychat/widgets/animations/tap_scale.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:material_ui/material_ui.dart';
@@ -375,15 +376,20 @@ class _ChatInputRowState extends State<ChatInputRow> {
             width: 48,
             child: Center(
               child: showSendButton
-                  ? IconButton(
-                      key: const Key('send_button'),
-                      tooltip: l10n.send,
-                      onPressed: controller.send,
-                      style: IconButton.styleFrom(
-                        backgroundColor: theme.bubbleColor,
-                        foregroundColor: theme.onBubbleColor,
+                  ? TapScale(
+                      // 发送是主操作：按下去缩一下 + 轻震。
+                      scale: 0.9,
+                      haptic: true,
+                      child: IconButton(
+                        key: const Key('send_button'),
+                        tooltip: l10n.send,
+                        onPressed: controller.send,
+                        style: IconButton.styleFrom(
+                          backgroundColor: theme.bubbleColor,
+                          foregroundColor: theme.onBubbleColor,
+                        ),
+                        icon: const Icon(Icons.send_outlined),
                       ),
-                      icon: const Icon(Icons.send_outlined),
                     )
                   : ChatAddMenuButton(controller: controller),
             ),

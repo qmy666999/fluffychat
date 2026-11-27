@@ -10,12 +10,14 @@ import 'package:fluffychat/pages/chat_list/chat_list.dart';
 import 'package:fluffychat/pages/chat_list/chat_list_item.dart';
 import 'package:fluffychat/pages/chat_list/chat_list_room_menu.dart';
 import 'package:fluffychat/pages/chat_list/dummy_chat_list_item.dart';
+import 'package:fluffychat/pages/chat_list/room_collapse.dart';
 import 'package:fluffychat/pages/chat_list/search_title.dart';
 import 'package:fluffychat/pages/chat_list/space_view.dart';
 import 'package:fluffychat/pages/chat_list/swipe_action_row.dart';
 import 'package:fluffychat/utils/stream_extension.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/public_room_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
+import 'package:fluffychat/widgets/animations/tap_scale.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -201,53 +203,61 @@ class ChatListViewBody extends StatelessWidget {
                       final space = spaceDelegateCandidates[room.id];
                       final theme = Theme.of(context);
                       final l10n = L10n.of(context);
-                      return SwipeActionRow(
-                        // 用房间 ID 当 key：列表滚动/重排时 Slidable 的展开状态
-                        // 不会串到别的会话上。
-                        itemKey: room.id,
-                        actions: [
-                          SwipeAction(
-                            label: l10n.chatMenuMarkUnread,
-                            color: theme.colorScheme.secondaryContainer,
-                            foreground: theme.colorScheme.onSecondaryContainer,
-                            onPressed: () async {
-                              if (room.markedUnread ||
-                                  room.notificationCount > 0) {
-                                await room.markUnread(false);
-                                await room.setReadMarker(
-                                  room.lastEvent?.eventId,
-                                );
-                              } else {
-                                await room.markUnread(true);
-                              }
-                            },
+                      return CollapsingRoomTile(
+                        roomId: room.id,
+                        child: TapScale(
+                          // 列表行的按压反馈弱一点（0.98），滚动时不至于晃眼。
+                          scale: 0.98,
+                          child: SwipeActionRow(
+                            // 用房间 ID 当 key：列表滚动/重排时 Slidable 的展开状态
+                            // 不会串到别的会话上。
+                            itemKey: room.id,
+                            actions: [
+                              SwipeAction(
+                                label: l10n.chatMenuMarkUnread,
+                                color: theme.colorScheme.secondaryContainer,
+                                foreground:
+                                    theme.colorScheme.onSecondaryContainer,
+                                onPressed: () async {
+                                  if (room.markedUnread ||
+                                      room.notificationCount > 0) {
+                                    await room.markUnread(false);
+                                    await room.setReadMarker(
+                                      room.lastEvent?.eventId,
+                                    );
+                                  } else {
+                                    await room.markUnread(true);
+                                  }
+                                },
+                              ),
+                              SwipeAction(
+                                label: l10n.delete,
+                                color: theme.colorScheme.error,
+                                onPressed: () async {
+                                  final result = await showOkCancelAlertDialog(
+                                    context: context,
+                                    title: l10n.chatDeleteConfirmTitle,
+                                    message: l10n.chatDeleteConfirmBody,
+                                    okLabel: l10n.delete,
+                                    cancelLabel: l10n.cancel,
+                                    isDestructive: true,
+                                  );
+                                  if (result != OkCancelResult.ok) return;
+                                  RoomCollapse.collapse(room.id, room.forget);
+                                },
+                              ),
+                            ],
+                            child: ChatListItem(
+                              room,
+                              space: space,
+                              key: Key('chat_list_item_${room.id}'),
+                              filter: filter,
+                              onTap: () => controller.onChatTap(room),
+                              onLongPress: (context) =>
+                                  showChatListRoomMenu(context, room),
+                              activeChat: controller.activeChat == room.id,
+                            ),
                           ),
-                          SwipeAction(
-                            label: l10n.delete,
-                            color: theme.colorScheme.error,
-                            onPressed: () async {
-                              final result = await showOkCancelAlertDialog(
-                                context: context,
-                                title: l10n.chatDeleteConfirmTitle,
-                                message: l10n.chatDeleteConfirmBody,
-                                okLabel: l10n.delete,
-                                cancelLabel: l10n.cancel,
-                                isDestructive: true,
-                              );
-                              if (result != OkCancelResult.ok) return;
-                              await room.forget();
-                            },
-                          ),
-                        ],
-                        child: ChatListItem(
-                          room,
-                          space: space,
-                          key: Key('chat_list_item_${room.id}'),
-                          filter: filter,
-                          onTap: () => controller.onChatTap(room),
-                          onLongPress: (context) =>
-                              showChatListRoomMenu(context, room),
-                          activeChat: controller.activeChat == room.id,
                         ),
                       );
                     },

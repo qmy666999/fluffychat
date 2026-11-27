@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/chat_list/room_collapse.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -102,7 +103,8 @@ Future<void> showChatListRoomMenu(BuildContext context, Room room) async {
         isDestructive: true,
       );
       if (result != OkCancelResult.ok) return;
-      await room.forget();
+      // 先播 280ms 的收起动画，动画结束才真正 forget。
+      RoomCollapse.collapse(room.id, room.forget);
     case null:
       return;
   }

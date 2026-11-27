@@ -7,6 +7,7 @@ import 'dart:ui' as ui;
 
 import 'package:collection/collection.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:fluffychat/config/m3_motion.dart';
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
@@ -17,6 +18,7 @@ import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 import 'package:fluffychat/utils/string_color.dart';
 import 'package:fluffychat/utils/wechat/message_retry.dart';
 import 'package:fluffychat/utils/wechat/room_kind.dart';
+import 'package:fluffychat/widgets/animations/message_shatter.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:fluffychat/widgets/member_actions_popup_menu_button.dart';
@@ -456,6 +458,7 @@ class Message extends StatelessWidget {
                                           event.transactionId ?? event.eventId,
                                         ),
                                         animateIn: animateIn,
+                                        eventId: event.eventId,
                                         child: Container(
                                           decoration: BoxDecoration(
                                             color: noBubble
@@ -1025,33 +1028,95 @@ class BubblePainter extends CustomPainter {
   }
 }
 
+/// 新消息弹入：上移 12dp + 0.92→1.0 + 淡入，220ms。
+///
+/// 同时顺手负责两件事：
+/// * 给气泡套一层 [RepaintBoundary]，撤回破碎时靠它把气泡拍成位图
+///   （见 `MessageShatter`）；
+/// * 撤回动画播放期间把气泡临时透明掉，但**保留占位**，
+///   否则下面的消息会在碎片还在飞的时候提前上移。
 class _AnimateIn extends StatefulWidget {
   final bool animateIn;
+  final String eventId;
   final Widget child;
-  const _AnimateIn({required this.animateIn, required this.child, super.key});
+  const _AnimateIn({
+    required this.animateIn,
+    required this.eventId,
+    required this.child,
+    super.key,
+  });
 
   @override
   State<_AnimateIn> createState() => __AnimateInState();
 }
 
-class __AnimateInState extends State<_AnimateIn> {
-  bool _animationFinished = false;
+class __AnimateInState extends State<_AnimateIn>
+    with SingleTickerProviderStateMixin {
+  static const Duration _duration = Duration(milliseconds: 220);
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: _duration,
+  );
+
+  late final Animation<double> _curve = _controller.drive(
+    CurveTween(curve: M3Motion.emphasizedDecel),
+  );
+
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 系统开了「移除动画」时 duration 变成 0，弹入瞬间完成。
+    _controller.duration = M3Motion.of(context, _duration);
+    if (_started) return;
+    _started = true;
+    if (widget.animateIn) {
+      _controller.forward();
+    } else {
+      _controller.value = 1;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Widget _wrapShatterable(Widget child) {
+    return ValueListenableBuilder<int>(
+      valueListenable: MessageShatter.revision,
+      builder: (context, _, child) => Opacity(
+        opacity: MessageShatter.isHidden(widget.eventId) ? 0 : 1,
+        child: child,
+      ),
+      child: RepaintBoundary(
+        key: MessageShatter.keyFor(widget.eventId),
+        child: child,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.animateIn) return widget.child;
-    if (!_animationFinished) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        setState(() {
-          _animationFinished = true;
-        });
-      });
-    }
+    final child = _wrapShatterable(widget.child);
+    if (!widget.animateIn) return child;
 
-    return AnimatedSize(
-      duration: FluffyThemes.animationDuration,
-      curve: FluffyThemes.animationCurve,
-      child: _animationFinished ? widget.child : const SizedBox.shrink(),
+    return AnimatedBuilder(
+      animation: _curve,
+      builder: (context, child) {
+        final t = _curve.value.clamp(0.0, 1.0);
+        return Opacity(
+          opacity: t,
+          child: Transform.translate(
+            offset: Offset(0, (1 - t) * 12),
+            child: Transform.scale(scale: 0.92 + 0.08 * t, child: child),
+          ),
+        );
+      },
+      child: child,
     );
   }
 }

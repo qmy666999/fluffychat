@@ -6,6 +6,7 @@
 import 'dart:async';
 
 import 'package:animations/animations.dart';
+import 'package:fluffychat/config/m3_motion.dart';
 import 'package:fluffychat/config/motion_settings.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/pages/archive/archive.dart';
@@ -764,6 +765,49 @@ abstract class AppRoutes {
     }
 
     final duration = MotionSettings.scaled(MotionSettings.baseDuration);
+
+    // 四个平级 tab 之间用横向共享轴：新页从右边 8dp 滑入 + 淡入，
+    // 旧页同时往左退 8dp，位移很小，看起来像「同一层左右推一下」而不是压栈。
+    //
+    // 只在用户选的是「系统默认 / 淡入淡出 / 共享轴」时接管：选 zoom、
+    // 容器变换这类风格的，说明他想要别的观感，tab 也尊重他的选择。
+    if (isTab &&
+        (style == MotionStyle.system ||
+            style == MotionStyle.fadeThrough ||
+            style == MotionStyle.sharedAxisX ||
+            style == MotionStyle.sharedAxisY)) {
+      return CustomTransitionPage(
+        key: state.pageKey,
+        restorationId: state.pageKey.value,
+        transitionDuration: duration,
+        reverseTransitionDuration: duration,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final incoming = animation.drive(
+            Tween<Offset>(
+              begin: const Offset(0.02, 0),
+              end: Offset.zero,
+            ).chain(CurveTween(curve: M3Motion.emphasizedDecel)),
+          );
+          final outgoing = secondaryAnimation.drive(
+            Tween<Offset>(
+              begin: Offset.zero,
+              end: const Offset(-0.02, 0),
+            ).chain(CurveTween(curve: M3Motion.emphasized)),
+          );
+          return SlideTransition(
+            position: outgoing,
+            child: SlideTransition(
+              position: incoming,
+              child: FadeTransition(
+                opacity: animation.drive(CurveTween(curve: Curves.easeIn)),
+                child: child,
+              ),
+            ),
+          );
+        },
+        child: child,
+      );
+    }
     return CustomTransitionPage(
       key: state.pageKey,
       restorationId: state.pageKey.value,

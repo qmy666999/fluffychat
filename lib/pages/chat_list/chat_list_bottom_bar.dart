@@ -2,10 +2,12 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'package:fluffychat/config/m3_motion.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
 import 'package:fluffychat/utils/moments/moments_service.dart';
+import 'package:fluffychat/widgets/animations/tap_scale.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
@@ -145,31 +147,40 @@ class _BottomBarItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconTheme.merge(
-            data: IconThemeData(
-              size: 24,
-              color: selected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurfaceVariant,
+    return TapScale(
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // 选中的图标弹一下：放大 12% 再停在放大的位置，
+            // 切 tab 时视觉上有个落点。
+            AnimatedScale(
+              scale: selected ? 1.12 : 1,
+              duration: M3Motion.of(context, const Duration(milliseconds: 240)),
+              curve: Curves.easeOutBack,
+              child: IconTheme.merge(
+                data: IconThemeData(
+                  size: 24,
+                  color: selected
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+                child: icon,
+              ),
             ),
-            child: icon,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: selected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurfaceVariant,
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: selected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

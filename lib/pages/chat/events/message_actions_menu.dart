@@ -5,10 +5,12 @@
 import 'dart:math' as math;
 
 import 'package:fluffychat/config/app_config.dart';
+import 'package:fluffychat/config/m3_motion.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/favorites/favorites_service.dart';
 import 'package:fluffychat/utils/wechat/message_retry.dart';
 import 'package:fluffychat/utils/wechat/reminder_service.dart';
+import 'package:fluffychat/widgets/animations/message_shatter.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -120,12 +122,18 @@ Future<void> showMessageActionsMenu(
     top = anchor == null ? safeTop + 8 : anchor.bottom + 8;
   }
 
+  final origin = anchor?.center ?? Offset(screen.width / 2, screen.height / 2);
+  final reduceMotion = M3Motion.reduceMotionOf(context);
+
   await showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
     barrierLabel: l10n.cancel,
     barrierColor: theme.colorScheme.scrim.withAlpha(40),
-    transitionDuration: const Duration(milliseconds: 140),
+    // 菜单从按下的位置圆形展开：250ms 的上限刚好在「能连续触发」的安全区里。
+    transitionDuration: reduceMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 250),
     pageBuilder: (dialogContext, _, _) => Stack(
       children: [
         Positioned.fill(
@@ -163,9 +171,43 @@ Future<void> showMessageActionsMenu(
         ),
       ],
     ),
-    transitionBuilder: (context, animation, _, child) =>
-        FadeTransition(opacity: animation, child: child),
+    transitionBuilder: (context, animation, _, child) => AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) => ClipPath(
+        clipper: _CircleRevealClipper(
+          center: origin,
+          progress: M3Motion.emphasizedDecel.transform(animation.value),
+        ),
+        child: child,
+      ),
+      child: child,
+    ),
   );
+}
+
+/// 以 [center] 为圆心、半径从 0 长到「刚好盖住全屏」的圆形裁剪。
+class _CircleRevealClipper extends CustomClipper<Path> {
+  _CircleRevealClipper({required this.center, required this.progress});
+
+  final Offset center;
+  final double progress;
+
+  @override
+  Path getClip(Size size) {
+    final dx = math.max(center.dx, size.width - center.dx);
+    final dy = math.max(center.dy, size.height - center.dy);
+    final maxRadius = math.sqrt(dx * dx + dy * dy);
+    return Path()..addOval(
+      Rect.fromCircle(
+        center: center,
+        radius: (maxRadius * progress).clamp(0.0, maxRadius),
+      ),
+    );
+  }
+
+  @override
+  bool shouldReclip(_CircleRevealClipper oldClipper) =>
+      oldClipper.progress != progress || oldClipper.center != center;
 }
 
 class _MessageAction {
@@ -249,7 +291,10 @@ Future<void> _confirmRedact(BuildContext context, Event event) async {
     ),
   );
   if (confirmed != true) return;
-  await event.redactEvent();
+  if (!context.mounted) return;
+  // 撤回时先把气泡拍成位图、碎成 48 片飞出去，动画结束再真正发撤回事件。
+  // 这样「消息消失」和「碎片飞散」是同一个动作，不会先消失再补动画。
+  await MessageShatter.shatterAndRedact(context, event);
 }
 
 void _copy(BuildContext context, Event event) {
