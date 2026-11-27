@@ -20,6 +20,7 @@ import 'package:fluffychat/utils/voip/matrix_voip.dart';
 import 'package:fluffychat/utils/wechat/reminder_service.dart';
 import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/app_update_dialog.dart';
 import 'package:fluffychat/widgets/fluffy_chat_app.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -268,15 +269,11 @@ class MatrixState extends State<Matrix> {
       if (entry == null || !mounted) return;
       final l10n = L10n.of(context);
       final preview = entry.text.trim();
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(
-          content: Text(
-            preview.isEmpty ? l10n.remindTitle : '${l10n.remindTitle}：$preview',
-          ),
-          action: SnackBarAction(
-            label: l10n.open,
-            onPressed: () => FluffyChatApp.router.go('/rooms/${entry.roomId}'),
-          ),
+      AppToast.show(
+        preview.isEmpty ? l10n.remindTitle : '${l10n.remindTitle}：$preview',
+        action: AppToastAction(
+          label: l10n.open,
+          onPressed: () => FluffyChatApp.router.go('/rooms/${entry.roomId}'),
         ),
       );
     });
@@ -386,9 +383,7 @@ class MatrixState extends State<Matrix> {
 
             if (!snackbarContext.mounted) return;
             final l10n = L10n.of(snackbarContext);
-            ScaffoldMessenger.of(
-              snackbarContext,
-            ).showSnackBar(SnackBar(content: Text(l10n.oneClientLoggedOut)));
+            AppToast.show(l10n.oneClientLoggedOut);
             return;
           }
           FluffyChatApp.router.go('/');

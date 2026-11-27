@@ -11,6 +11,7 @@ import 'package:fluffychat/utils/favorites/favorites_service.dart';
 import 'package:fluffychat/utils/wechat/message_retry.dart';
 import 'package:fluffychat/utils/wechat/reminder_service.dart';
 import 'package:fluffychat/widgets/animations/message_shatter.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -298,15 +299,13 @@ Future<void> _confirmRedact(BuildContext context, Event event) async {
 }
 
 void _copy(BuildContext context, Event event) {
-  final messenger = ScaffoldMessenger.of(context);
   final l10n = L10n.of(context);
   Clipboard.setData(ClipboardData(text: event.body));
-  messenger.showSnackBar(SnackBar(content: Text(l10n.copiedToClipboard)));
+  AppToast.show(l10n.copiedToClipboard);
 }
 
 Future<void> _pickReminder(BuildContext context, Event event) async {
   final l10n = L10n.of(context);
-  final messenger = ScaffoldMessenger.of(context);
   final now = DateTime.now();
   final choice = await showDialog<Duration>(
     context: context,
@@ -330,18 +329,11 @@ Future<void> _pickReminder(BuildContext context, Event event) async {
   );
   if (choice == null) return;
   await ReminderService(event.room.client).add(event, now.add(choice));
-  messenger.showSnackBar(SnackBar(content: Text(l10n.remindSet)));
+  AppToast.show(l10n.remindSet);
 }
 
 Future<void> _toggleFavorite(BuildContext context, Event event) async {
   final l10n = L10n.of(context);
-  final messenger = ScaffoldMessenger.of(context);
   final added = await FavoritesService(event.room.client).toggle(event);
-  messenger.showSnackBar(
-    SnackBar(
-      content: Text(
-        added ? l10n.messageFavorited : l10n.messageFavoriteRemoved,
-      ),
-    ),
-  );
+  AppToast.show(added ? l10n.messageFavorited : l10n.messageFavoriteRemoved);
 }

@@ -8,6 +8,7 @@ import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
 import 'package:fluffychat/utils/scan_flow.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:material_ui/material_ui.dart';
@@ -98,15 +99,11 @@ class _AddFriendPageState extends State<AddFriendPage> {
     try {
       await _service.sendFriendRequest(profile.userId, message);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.friendRequestSent)));
+      AppToast.show(l10n.friendRequestSent);
       setState(() {});
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.friendRequestFailed(e.toString()))),
-      );
+      AppToast.show(l10n.friendRequestFailed(e.toString()));
     }
   }
 

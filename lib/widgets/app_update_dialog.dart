@@ -3,6 +3,7 @@
 
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/updates/app_update_service.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
@@ -42,9 +43,7 @@ Future<void> checkAndPromptUpdate(
 }
 
 void _showMessage(BuildContext context, String message) {
-  ScaffoldMessenger.maybeOf(
-    context,
-  )?.showSnackBar(SnackBar(content: Text(message)));
+  AppToast.show(message);
 }
 
 Future<void> showAppUpdateDialog(BuildContext context, AppUpdateInfo info) =>

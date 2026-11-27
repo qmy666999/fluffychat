@@ -3235,5 +3235,8 @@
   "momentLoadingMore": "Loading…",
   "voiceRecordingCancelled": "Recording cancelled",
   "showRedactedMessages": "Show redaction notices",
-  "showRedactedMessagesHint": "When off, redacted messages disappear from the chat completely"
+  "showRedactedMessagesHint": "When off, redacted messages disappear from the chat completely",
+  "remarkOnlyYouCanSee": "Only visible to you. The other person is not notified.",
+  "nicknameLabel": "Nickname: {name}",
+  "@nicknameLabel": {"placeholders": {"name": {"type": "String"}}}
 }

@@ -8,7 +8,9 @@ import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list_bottom_bar.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
 import 'package:fluffychat/utils/wechat/friend_tags_service.dart';
+import 'package:fluffychat/utils/wechat/remark_service.dart';
 import 'package:fluffychat/utils/wechat/room_kind.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
@@ -60,9 +62,57 @@ class _ContactsPageState extends State<ContactsPage> {
       context.go('/rooms/$roomId');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(L10n.of(context).openChatFailed(e.toString()))),
-      );
+      AppToast.show(L10n.of(context).openChatFailed(e.toString()));
+    }
+  }
+
+  /// 长按好友：发消息 / 设置备注（微信长按好友的交互）。
+  Future<void> _showFriendActions(FriendEntry friend) async {
+    final l10n = L10n.of(context);
+    final client = Matrix.of(context).client;
+    final remark = RemarkService(client).remarkOf(friend.userId);
+    final action = await showModalBottomSheet<_FriendAction>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(
+                remark ?? friend.title,
+                style: Theme.of(sheetContext).textTheme.titleMedium,
+              ),
+              subtitle: Text(friend.userId),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: Text(l10n.sendMessage),
+              onTap: () =>
+                  Navigator.of(sheetContext).pop(_FriendAction.message),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: Text(l10n.setRemark),
+              onTap: () => Navigator.of(sheetContext).pop(_FriendAction.remark),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _FriendAction.message:
+        await _openChat(friend.userId);
+      case _FriendAction.remark:
+        await showRemarkDialog(
+          context,
+          friend.userId,
+          originalName: friend.displayName,
+        );
+        if (mounted) setState(() {});
     }
   }
 
@@ -205,17 +255,25 @@ class _ContactsPageState extends State<ContactsPage> {
                             key: ValueKey(friend.userId),
                             leading: Avatar(
                               mxContent: _parseUri(friend.avatarUrl),
-                              name: friend.title,
+                              name:
+                                  RemarkService(
+                                    client,
+                                  ).remarkOf(friend.userId) ??
+                                  friend.title,
                               size: Avatar.defaultSize * 0.9,
                             ),
-                            title: Text(friend.title, maxLines: 1),
+                            title: Text(
+                              RemarkService(client).remarkOf(friend.userId) ??
+                                  friend.title,
+                              maxLines: 1,
+                            ),
                             // 好友行只显示名字，不显示 Matrix ID（ID 在资料页里看）
                             trailing: const Icon(Icons.chat_bubble_outline),
                             onTap: () => context.push(
                               '/contacts/friend?userId=${Uri.encodeComponent(friend.userId)}',
                             ),
-                            // 长按直接进聊天，和微信「按住头像旁边的名字」一致。
-                            onLongPress: () => _openChat(friend.userId),
+                            // 长按弹菜单：发消息 / 设置备注（微信长按好友的交互）。
+                            onLongPress: () => _showFriendActions(friend),
                           ),
                       ],
                       const SizedBox(height: 24),
@@ -372,3 +430,6 @@ String _initial(String name) {
 
 Uri? _parseUri(String? value) =>
     value == null || value.isEmpty ? null : Uri.tryParse(value);
+
+/// 长按好友时弹出的菜单项。
+enum _FriendAction { message, remark }

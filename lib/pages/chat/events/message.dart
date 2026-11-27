@@ -17,6 +17,7 @@ import 'package:fluffychat/utils/file_description.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 import 'package:fluffychat/utils/string_color.dart';
 import 'package:fluffychat/utils/wechat/message_retry.dart';
+import 'package:fluffychat/utils/wechat/remark_service.dart';
 import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:fluffychat/widgets/animations/message_shatter.dart';
 import 'package:fluffychat/widgets/avatar.dart';
@@ -348,6 +349,9 @@ class Message extends StatelessWidget {
                                       future: event.fetchSenderUser(),
                                       builder: (context, snapshot) {
                                         final displayname =
+                                            RemarkService(
+                                              event.room.client,
+                                            ).remarkOf(event.senderId) ??
                                             snapshot.data?.calcDisplayname() ??
                                             sender.calcDisplayname();
                                         return ConstrainedBox(

@@ -4,10 +4,13 @@
 
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
+import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
+import 'package:fluffychat/utils/wechat/remark_service.dart';
 import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
@@ -44,7 +47,7 @@ class _ChatInfoPageState extends State<ChatInfoPage> {
 
   void _snack(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    AppToast.show(text);
   }
 
   Future<void> _setMuted(Room room, bool muted) => _setBusy(() async {
@@ -62,6 +65,19 @@ class _ChatInfoPageState extends State<ChatInfoPage> {
   }
 
   Future<void> _openSearch() => context.push('/rooms/${widget.roomId}/search');
+
+  Future<void> _setRemark(Room room) async {
+    final peer = room.directChatMatrixID;
+    if (peer == null) return;
+    await showRemarkDialog(
+      context,
+      peer,
+      originalName: room.getLocalizedDisplayname(
+        MatrixLocals(L10n.of(context)),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
 
   Future<void> _setBackground() => context.push('/rooms/settings/style');
 
@@ -269,6 +285,13 @@ class _ChatInfoPageState extends State<ChatInfoPage> {
                 ),
                 const Divider(height: 1),
               ],
+              if (isDirect)
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined),
+                  title: Text(l10n.setRemark),
+                  trailing: const Icon(Icons.chevron_right_outlined),
+                  onTap: () => _setRemark(room),
+                ),
               ListTile(
                 leading: const Icon(Icons.search_outlined),
                 title: Text(l10n.searchChatHistory),
@@ -371,23 +394,24 @@ class _DirectHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = L10n.of(context);
     final peer = room.directChatMatrixID ?? '';
+    final remark = peer.isEmpty
+        ? null
+        : RemarkService(room.client).remarkOf(peer);
+    final displayname =
+        remark ?? room.getLocalizedDisplayname(MatrixLocals(l10n));
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       child: Row(
         spacing: 16,
         children: [
-          Avatar(
-            mxContent: room.avatar,
-            name: room.getLocalizedDisplayname(),
-            size: 64,
-          ),
+          Avatar(mxContent: room.avatar, name: displayname, size: 64),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               spacing: 4,
               children: [
                 Text(
-                  room.getLocalizedDisplayname(),
+                  displayname,
                   style: theme.textTheme.titleLarge,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

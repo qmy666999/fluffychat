@@ -3,6 +3,7 @@
 
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/voip/matrix_voip.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:matrix/matrix.dart';
 
@@ -16,19 +17,14 @@ Future<void> startChatCall(
   CallType type,
 ) async {
   final l10n = L10n.of(context);
-  final messenger = ScaffoldMessenger.maybeOf(context);
   void showAlreadyInCall() {
-    messenger
-      ?..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(l10n.callAlreadyInCall),
-          action: SnackBarAction(
-            label: l10n.callBackToCall,
-            onPressed: MatrixVoip.openCallPage,
-          ),
-        ),
-      );
+    AppToast.show(
+      l10n.callAlreadyInCall,
+      action: AppToastAction(
+        label: l10n.callBackToCall,
+        onPressed: MatrixVoip.openCallPage,
+      ),
+    );
   }
 
   final voip = MatrixVoip.ensure(room.client);
@@ -47,6 +43,6 @@ Future<void> startChatCall(
     MatrixVoip.openCallPage();
   } catch (e, s) {
     Logs().w('[VoIP] 发起通话失败', e, s);
-    messenger?.showSnackBar(SnackBar(content: Text(l10n.callStartFailed)));
+    AppToast.show(l10n.callStartFailed);
   }
 }

@@ -9,6 +9,7 @@ import 'package:fluffychat/pages/chat_list/chat_list.dart';
 import 'package:fluffychat/utils/moments/moments_service.dart';
 import 'package:fluffychat/utils/scan_flow.dart';
 import 'package:fluffychat/utils/sync_status_localization.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -164,11 +165,7 @@ class ChatListHeader extends StatelessWidget implements PreferredSizeWidget {
                 case 'scan':
                   startMatrixScan(context);
                 case 'pay':
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(L10n.of(context).receiveMoneyUnavailable),
-                    ),
-                  );
+                  AppToast.show(L10n.of(context).receiveMoneyUnavailable);
               }
             },
             itemBuilder: (context) => [

@@ -22,6 +22,7 @@ import 'package:fluffychat/utils/size_string.dart';
 import 'package:fluffychat/utils/start_push_foreground_service.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/adaptive_dialog_action.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/dialog_text_field.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart' hide Result;
 import 'package:mime/mime.dart';
@@ -84,7 +85,6 @@ class SendFileDialogState extends State<SendFileDialog> {
 
   Future<void> _send(String? uniqueFileType) async {
     final l10n = L10n.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(widget.outerContext);
 
     final proceed = await showTrustUserInRoomDialog(
       widget.outerContext,
@@ -95,9 +95,7 @@ class SendFileDialogState extends State<SendFileDialog> {
     if (ForegroundServices.platformSupported) {
       await ForegroundServices.startService('send_files');
     } else {
-      scaffoldMessenger.showLoadingSnackBar(
-        l10n.sendingFilesDoNotExit(widget.files.length),
-      );
+      _showLoadingToast(l10n.sendingFilesDoNotExit(widget.files.length));
     }
     try {
       if (!widget.room.otherPartyCanReceiveMessages) {
@@ -128,16 +126,14 @@ class SendFileDialogState extends State<SendFileDialog> {
             mimeType.startsWith('video')) {
           final lengthResult = await Result.capture(xfile.length());
           final length = lengthResult.asValue?.value;
-          scaffoldMessenger.clearSnackBars();
-          scaffoldMessenger.showLoadingSnackBar(l10n.compressingVideo);
+          AppToast.dismiss();
+          _showLoadingToast(l10n.compressingVideo);
           file = await xfile.getVideoInfo(
             compress: length != null && length > minSizeToCompress && compress,
           );
-          scaffoldMessenger.clearSnackBars();
+          AppToast.dismiss();
           if (!ForegroundServices.platformSupported) {
-            scaffoldMessenger.showLoadingSnackBar(
-              l10n.sendingFilesDoNotExit(widget.files.length),
-            );
+            _showLoadingToast(l10n.sendingFilesDoNotExit(widget.files.length));
           }
         } else {
           // Else we just create a MatrixFile
@@ -186,7 +182,7 @@ class SendFileDialogState extends State<SendFileDialog> {
       if (ForegroundServices.platformSupported) {
         await ForegroundServices.stopService('send_files');
       } else {
-        scaffoldMessenger.clearSnackBars();
+        AppToast.dismiss();
       }
     }
 
@@ -658,7 +654,6 @@ class _ImageEditPageState extends State<_ImageEditPage> {
   Future<void> _save() async {
     if (_saving) return;
     final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
     final image = _image;
     // Nothing was changed: keep the original file untouched (pop with null).
     if (image == null || !_hasEdits) {
@@ -674,7 +669,7 @@ class _ImageEditPageState extends State<_ImageEditPage> {
       Logs().w('Unable to save edited image', e, s);
       if (!mounted) return;
       setState(() => _saving = false);
-      messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+      AppToast.show(e.toString());
     }
   }
 
@@ -936,24 +931,19 @@ class _ImageEditPageState extends State<_ImageEditPage> {
   }
 }
 
-extension on ScaffoldMessengerState {
-  void showLoadingSnackBar(String title) => showSnackBar(
-    SnackBar(
-      showCloseIcon: false,
-      persist: true,
-      content: Row(
-        spacing: 8,
-        children: [
-          Expanded(child: Text(title, overflow: .ellipsis, maxLines: 1)),
-          SizedBox.square(
-            dimension: 16,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: Theme.of(context).colorScheme.onInverseSurface,
-            ),
-          ),
-        ],
-      ),
+/// 上传 / 压缩的进度提示：不是轻提示，所以一直挂着，直到 [AppToast.dismiss]。
+void _showLoadingToast(String title) {
+  AppToast.showCustom(
+    Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: 8,
+      children: [
+        Flexible(child: Text(title, overflow: .ellipsis, maxLines: 1)),
+        SizedBox.square(
+          dimension: 14,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ],
     ),
   );
 }

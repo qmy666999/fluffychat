@@ -12,6 +12,7 @@ import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/sign_in_flows/oidc_login.dart';
 import 'package:fluffychat/utils/sign_in_flows/sso_login.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
@@ -101,12 +102,8 @@ Future<void> connectToHomeserverFlow(
     Logs().w('Unable to login', e, s);
     setState(AsyncSnapshot.withError(ConnectionState.done, e, s));
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          e.toLocalizedString(context, ExceptionContext.checkHomeserver),
-        ),
-      ),
+    AppToast.show(
+      e.toLocalizedString(context, ExceptionContext.checkHomeserver),
     );
   }
 }

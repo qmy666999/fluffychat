@@ -32,6 +32,7 @@ import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/show_scaffold_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:fluffychat/widgets/mxc_image.dart';
@@ -334,18 +335,7 @@ class ChatController extends State<ChatPageWithRoom>
     final shareItems = widget.shareItems;
     if (shareItems == null || shareItems.isEmpty) return;
     if (!room.otherPartyCanReceiveMessages) {
-      final theme = Theme.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: theme.colorScheme.errorContainer,
-          closeIconColor: theme.colorScheme.onErrorContainer,
-          content: Text(
-            L10n.of(context).otherPartyNotLoggedIn,
-            style: TextStyle(color: theme.colorScheme.onErrorContainer),
-          ),
-          showCloseIcon: true,
-        ),
-      );
+      AppToast.show(L10n.of(context).otherPartyNotLoggedIn, isError: true);
       return;
     }
     final proceed = await showTrustUserInRoomDialog(context, room);
@@ -985,7 +975,6 @@ class ChatController extends State<ChatPageWithRoom>
   ) async {
     final proceed = await showTrustUserInRoomDialog(context, room);
     if (!mounted || !proceed) return;
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     final bytesResult = await showFutureLoadingDialog(
       context: context,
@@ -1028,9 +1017,7 @@ class ChatController extends State<ChatPageWithRoom>
       );
     } catch (e) {
       if (!mounted) return;
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text(e.toLocalizedString(context))),
-      );
+      AppToast.show(e.toLocalizedString(context));
       return;
     }
     setState(() {
@@ -1088,7 +1075,6 @@ class ChatController extends State<ChatPageWithRoom>
   Future<void> reportEventAction() async {
     final event = selectedEvents.single;
     final l10n = L10n.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     if (!mounted) return;
     final reason = await showTextInputDialog(
       context: context,
@@ -1111,9 +1097,7 @@ class ChatController extends State<ChatPageWithRoom>
       showEmojiPicker = false;
       selectedEvents.clear();
     });
-    scaffoldMessenger.showSnackBar(
-      SnackBar(content: Text(l10n.contentHasBeenReported)),
-    );
+    AppToast.show(l10n.contentHasBeenReported);
   }
 
   Future<void> deleteErrorEventsAction() async {

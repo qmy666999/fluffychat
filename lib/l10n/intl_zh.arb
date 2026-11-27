@@ -3235,5 +3235,8 @@
   "momentLoadingMore": "正在加载…",
   "voiceRecordingCancelled": "已取消",
   "showRedactedMessages": "显示撤回提示",
-  "showRedactedMessagesHint": "关闭后，撤回的消息会从聊天里彻底消失"
+  "showRedactedMessagesHint": "关闭后，撤回的消息会从聊天里彻底消失",
+  "remarkOnlyYouCanSee": "仅对你可见，对方不会收到通知",
+  "nicknameLabel": "昵称：{name}",
+  "@nicknameLabel": {"placeholders": {"name": {"type": "String"}}}
 }

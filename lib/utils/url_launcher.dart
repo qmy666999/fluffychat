@@ -8,6 +8,7 @@ import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/user_dialog.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
@@ -33,7 +34,6 @@ class UrlLauncher {
 
   Future<void> launchUrl() async {
     final l10n = L10n.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     if (url!.toLowerCase().startsWith(AppConfig.deepLinkPrefix) ||
         url!.toLowerCase().startsWith(AppConfig.inviteLinkPrefix) ||
         {'#', '@', '!', '+', '\$'}.contains(url![0]) ||
@@ -43,9 +43,7 @@ class UrlLauncher {
     final uri = Uri.tryParse(url!);
     if (uri == null) {
       // we can't open this thing
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text(l10n.cantOpenUri(url!))),
-      );
+      AppToast.show(l10n.cantOpenUri(url!));
       return;
     }
 
@@ -103,9 +101,7 @@ class UrlLauncher {
       return;
     }
     if (uri.host.isEmpty) {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text(l10n.cantOpenUri(url!))),
-      );
+      AppToast.show(l10n.cantOpenUri(url!));
       return;
     }
     // okay, we have either an http or an https URI.

@@ -9,6 +9,7 @@ import 'package:fluffychat/utils/error_reporter.dart';
 import 'package:fluffychat/utils/file_description.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/utils/url_launcher.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:just_audio/just_audio.dart';
@@ -216,9 +217,7 @@ class AudioPlayerState extends State<AudioPlayerWidget>
     } catch (e, s) {
       Logs().v('Could not download audio file', e, s);
       if (!mounted) rethrow;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toLocalizedString(context))));
+      AppToast.show(e.toLocalizedString(context));
       rethrow;
     }
     if (!context.mounted) return;

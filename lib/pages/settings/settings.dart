@@ -14,6 +14,7 @@ import 'package:fluffychat/utils/file_selector.dart';
 import 'package:fluffychat/utils/refresh_own_profile.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -154,9 +155,7 @@ class SettingsController extends State<Settings> {
       return prepareAvatarBytes(bytes);
     } on UnsupportedAvatarFormat {
       if (!mounted) return null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(L10n.of(context).avatarUnsupportedFormat)),
-      );
+      AppToast.show(L10n.of(context).avatarUnsupportedFormat);
       return null;
     }
   }

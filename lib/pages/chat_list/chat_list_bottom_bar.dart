@@ -8,6 +8,7 @@ import 'package:fluffychat/pages/chat_list/chat_list.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
 import 'package:fluffychat/utils/moments/moments_service.dart';
 import 'package:fluffychat/widgets/animations/tap_scale.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
@@ -18,18 +19,40 @@ import 'package:matrix/matrix.dart';
 ///
 /// 四个页面都是平级 tab：点击用 `go` 切换（不压栈），所以二级页面不会出现
 /// 返回箭头，底部导航也一直都在。
-class ChatListBottomBar extends StatelessWidget {
+class ChatListBottomBar extends StatefulWidget {
   final ChatListController? controller;
   final int currentIndex;
 
   const ChatListBottomBar({this.controller, this.currentIndex = 0, super.key});
 
   @override
+  State<ChatListBottomBar> createState() => _ChatListBottomBarState();
+}
+
+class _ChatListBottomBarState extends State<ChatListBottomBar> {
+  /// 胶囊提示要贴在底部栏上沿，注册这个锚点
+  final GlobalKey _barKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    AppToast.bottomBarKey = _barKey;
+  }
+
+  @override
+  void dispose() {
+    if (AppToast.bottomBarKey == _barKey) AppToast.bottomBarKey = null;
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final client = Matrix.of(context).client;
+    final currentIndex = widget.currentIndex;
 
     return Material(
+      key: _barKey,
       color: theme.colorScheme.surfaceContainer,
       child: SafeArea(
         top: false,

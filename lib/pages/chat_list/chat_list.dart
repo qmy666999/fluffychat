@@ -26,6 +26,7 @@ import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_modal_action_popup.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
 import 'package:fluffychat/widgets/share_scaffold_dialog.dart';
@@ -189,7 +190,6 @@ class ChatListController extends State<ChatList>
   /// 必须 await 到真正结束，不然 RefreshIndicator 的转圈不会收回去。
   Future<void> refreshChatList() async {
     final client = Matrix.of(context).client;
-    final messenger = ScaffoldMessenger.maybeOf(context);
     final l10n = L10n.of(context);
     try {
       await client.sync(timeout: 5000);
@@ -198,7 +198,7 @@ class ChatListController extends State<ChatList>
       if (mounted) setState(() {});
     } catch (e, s) {
       Logs().w('[refresh] 下拉刷新失败', e, s);
-      messenger?.showSnackBar(SnackBar(content: Text(l10n.refreshFailed)));
+      AppToast.show(l10n.refreshFailed);
     }
   }
 
@@ -244,7 +244,6 @@ class ChatListController extends State<ChatList>
 
   Future<void> _search() async {
     final client = Matrix.of(context).client;
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     if (!isSearching) {
       setState(() {
         isSearching = true;
@@ -288,9 +287,7 @@ class ChatListController extends State<ChatList>
     } catch (e, s) {
       Logs().w('Searching has crashed', e, s);
       if (!mounted) return;
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text(e.toLocalizedString(context))),
-      );
+      AppToast.show(e.toLocalizedString(context));
     }
     if (!isSearchMode) return;
     setState(() {
@@ -981,26 +978,12 @@ class ChatListController extends State<ChatList>
           (device) => !device.verified && !device.blocked,
         ) ??
         false) {
-      late final ScaffoldFeatureController controller;
-      final theme = Theme.of(context);
-      controller = ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 15),
-          showCloseIcon: true,
-          backgroundColor: theme.colorScheme.errorContainer,
-          closeIconColor: theme.colorScheme.onErrorContainer,
-          content: Text(
-            L10n.of(context).oneOfYourDevicesIsNotVerified,
-            style: TextStyle(color: theme.colorScheme.onErrorContainer),
-          ),
-          action: SnackBarAction(
-            onPressed: () {
-              controller.close();
-              router.go('/rooms/settings/devices');
-            },
-            textColor: theme.colorScheme.onErrorContainer,
-            label: L10n.of(context).settings,
-          ),
+      AppToast.show(
+        L10n.of(context).oneOfYourDevicesIsNotVerified,
+        isError: true,
+        action: AppToastAction(
+          label: L10n.of(context).settings,
+          onPressed: () => router.go('/rooms/settings/devices'),
         ),
       );
     }

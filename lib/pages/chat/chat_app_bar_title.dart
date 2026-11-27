@@ -10,6 +10,7 @@ import 'package:fluffychat/utils/date_time_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 import 'package:fluffychat/utils/sync_status_localization.dart';
 import 'package:fluffychat/utils/verified_room_extension.dart';
+import 'package:fluffychat/utils/wechat/remark_service.dart';
 import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/presence_builder.dart';
@@ -35,7 +36,12 @@ class ChatAppBarTitle extends StatelessWidget {
     // 两人会话一律显示对方昵称（微信语义），只有真的群聊才显示房间名。
     final isSinglePeer = isSinglePeerChat(room);
     final peer = isSinglePeer ? _peer(room) : null;
+    // 备注优先（只对自己生效），没有备注再退回对方昵称。
+    final remark = peer == null
+        ? null
+        : RemarkService(room.client).remarkOf(peer.id);
     final title =
+        remark ??
         peer?.calcDisplayname() ??
         room.getLocalizedDisplayname(MatrixLocals(L10n.of(context)));
     final avatar = peer?.avatarUrl ?? room.avatar;

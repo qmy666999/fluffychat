@@ -11,6 +11,7 @@ import 'package:fluffychat/pages/settings/settings.dart';
 import 'package:fluffychat/utils/file_selector.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:image_picker/image_picker.dart';
@@ -41,7 +42,6 @@ class ChatDetailsController extends State<ChatDetails> {
 
   Future<void> setDisplaynameAction() async {
     final l10n = L10n.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final room = Matrix.of(context).client.getRoomById(roomId!)!;
     final input = await showTextInputDialog(
       context: context,
@@ -58,15 +58,12 @@ class ChatDetailsController extends State<ChatDetails> {
     );
     if (!mounted) return;
     if (success.error == null) {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text(l10n.displaynameHasBeenChanged)),
-      );
+      AppToast.show(l10n.displaynameHasBeenChanged);
     }
   }
 
   Future<void> setTopicAction() async {
     final l10n = L10n.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final room = Matrix.of(context).client.getRoomById(roomId!)!;
     final input = await showTextInputDialog(
       context: context,
@@ -86,9 +83,7 @@ class ChatDetailsController extends State<ChatDetails> {
     );
     if (!mounted) return;
     if (success.error == null) {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text(l10n.chatDescriptionHasBeenChanged)),
-      );
+      AppToast.show(l10n.chatDescriptionHasBeenChanged);
     }
   }
 

@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:fluffychat/utils/error_reporter.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
@@ -170,9 +171,7 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
         context,
         'Unable to init crypto identity',
       ).onErrorCallback(e, s);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toLocalizedString(context))));
+      AppToast.show(e.toLocalizedString(context));
       value.isLoading = false;
     }
     notifyListeners();
@@ -270,9 +269,7 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
     } catch (e, s) {
       Logs().d('Unable to read recovery key file', e, s);
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toLocalizedString(context))));
+        AppToast.show(e.toLocalizedString(context));
       }
     }
     if (context.mounted) await unlock(context);

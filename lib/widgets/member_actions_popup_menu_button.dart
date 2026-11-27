@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/permission_slider_dialog.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -20,7 +21,6 @@ Future<void> showMemberActionsPopupMenu({
   void Function()? onMention,
 }) async {
   final l10n = L10n.of(context);
-  final scaffoldMessenger = ScaffoldMessenger.of(context);
   final theme = Theme.of(context);
   final displayname = user.calcDisplayname();
   final isMe = user.room.client.userID == user.id;
@@ -298,9 +298,7 @@ Future<void> showMemberActionsPopupMenu({
       );
       if (result.error != null) return;
       if (!context.mounted) return;
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text(l10n.contentHasBeenReported)),
-      );
+      AppToast.show(l10n.contentHasBeenReported);
       return;
     case _MemberActions.info:
       await UserDialog.show(

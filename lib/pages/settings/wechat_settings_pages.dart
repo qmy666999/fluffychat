@@ -11,6 +11,7 @@ import 'package:fluffychat/utils/notifications/notification_log.dart';
 import 'package:fluffychat/utils/updates/app_update_service.dart';
 import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:flutter/services.dart';
@@ -51,9 +52,7 @@ class _SettingsNotificationsPageState extends State<SettingsNotificationsPage> {
     if (!mounted) return;
     setState(() => _sendingTest = false);
     if (!ok) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.notificationTestBlocked)));
+      AppToast.show(l10n.notificationTestBlocked);
     }
   }
 
@@ -64,11 +63,7 @@ class _SettingsNotificationsPageState extends State<SettingsNotificationsPage> {
     if (!mounted) return;
     setState(() => _openingSettings = false);
     if (!opened) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(L10n.of(context).openNotificationSettingsFailed),
-        ),
-      );
+      AppToast.show(L10n.of(context).openNotificationSettingsFailed);
     }
   }
 
@@ -215,9 +210,7 @@ class _NotificationDiagnosticsTile extends StatelessWidget {
       ),
     );
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(l10n.copy)));
+    AppToast.show(l10n.copy);
   }
 
   @override
@@ -643,7 +636,6 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
 
   Future<void> _cleanLeftRooms(List<Room> rooms) async {
     final l10n = L10n.of(context);
-    final messenger = ScaffoldMessenger.of(context);
     final client = Matrix.of(context).client;
     final result = await showOkCancelAlertDialog(
       context: context,
@@ -667,9 +659,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     client.rooms.removeWhere((room) => room.membership != Membership.join);
     if (!mounted) return;
     setState(() => _cleaning = false);
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.cleanLeftRoomsDone('$count'))),
-    );
+    AppToast.show(l10n.cleanLeftRoomsDone('$count'));
   }
 }
 
@@ -691,7 +681,5 @@ class _WechatSettingsScaffold extends StatelessWidget {
 }
 
 void _showComingSoon(BuildContext context) {
-  ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(L10n.of(context).featureComingSoon)));
+  AppToast.show(L10n.of(context).featureComingSoon);
 }

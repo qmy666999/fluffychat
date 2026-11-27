@@ -8,9 +8,10 @@ import 'package:fluffychat/utils/fluffy_share.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
 import 'package:fluffychat/utils/moments/moments_service.dart';
 import 'package:fluffychat/utils/voip/call_actions.dart';
+import 'package:fluffychat/utils/wechat/remark_service.dart';
 import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
-import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
@@ -76,9 +77,7 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
 
   Future<void> _openMoments() async {
     if (_momentsLoaded && _recentMomentImages.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(L10n.of(context).noMomentsForFriend)),
-      );
+      AppToast.show(L10n.of(context).noMomentsForFriend);
       return;
     }
     await context.push(
@@ -94,9 +93,7 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
       context.go('/rooms/$roomId');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(L10n.of(context).openChatFailed(e.toString()))),
-      );
+      AppToast.show(L10n.of(context).openChatFailed(e.toString()));
     }
   }
 
@@ -109,23 +106,17 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
       await startChatCall(context, room, type);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(L10n.of(context).callStartFailed)));
+      AppToast.show(L10n.of(context).callStartFailed);
     }
   }
 
   Future<void> _setRemark() async {
-    final l10n = L10n.of(context);
     final friend = _service.load().friend(widget.userId);
-    final remark = await showTextInputDialog(
-      context: context,
-      title: l10n.setRemark,
-      initialText: friend?.remark ?? '',
-      hintText: l10n.remarkHint,
+    await showRemarkDialog(
+      context,
+      widget.userId,
+      originalName: friend?.displayName,
     );
-    if (remark == null) return;
-    await _service.setRemark(widget.userId, remark);
     if (mounted) setState(() {});
   }
 
@@ -171,16 +162,12 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
       debugPrint('[friends] ignore failed: $e');
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(l10n.addToBlacklist)));
+    AppToast.show(l10n.addToBlacklist);
   }
 
   void _complain() {
     final l10n = L10n.of(context);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(l10n.complainThanks)));
+    AppToast.show(l10n.complainThanks);
   }
 
   Future<void> _pickCall() async {
@@ -231,7 +218,10 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
     final l10n = L10n.of(context);
     final theme = Theme.of(context);
     final friend = _service.load().friend(widget.userId);
-    final title = friend?.title ?? widget.userId;
+    final client = Matrix.of(context).client;
+    final remark = RemarkService(client).remarkOf(widget.userId);
+    final originalName = friend?.title ?? widget.userId;
+    final title = remark ?? originalName;
     final starred = WechatPrefs.isStarred(widget.userId);
 
     return Scaffold(
@@ -292,11 +282,16 @@ class _FriendProfilePageState extends State<FriendProfilePage> {
               style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
             ),
           ),
-          if ((friend?.remark ?? '').trim().isNotEmpty)
-            Center(
-              child: Text(
-                friend!.remark,
-                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+          if (remark != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Center(
+                child: Text(
+                  l10n.nicknameLabel(originalName),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
             ),
           const SizedBox(height: 24),

@@ -12,6 +12,7 @@ import 'package:fluffychat/pages/chat/recording_view_model.dart';
 import 'package:fluffychat/utils/other_party_can_receive.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/widgets/animations/tap_scale.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:material_ui/material_ui.dart';
@@ -69,6 +70,13 @@ class _ChatInputRowState extends State<ChatInputRow> {
   final ValueNotifier<bool> _cancelNotifier = ValueNotifier<bool>(false);
 
   ChatController get controller => widget.controller;
+
+  @override
+  void initState() {
+    super.initState();
+    // 胶囊提示要贴在输入栏上沿，注册这个锚点
+    AppToast.composerKey = _composerKey;
+  }
 
   Future<void> _startHold(RecordingViewModelState recording) async {
     if (recording.isRecording) return;
@@ -235,16 +243,12 @@ class _ChatInputRowState extends State<ChatInputRow> {
     if (!wasRecording) return;
     if (cancel) {
       recording.cancel();
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(content: Text(L10n.of(context).voiceRecordingCancelled)),
-      );
+      AppToast.show(L10n.of(context).voiceRecordingCancelled);
       return;
     }
     if (tooShort) {
       recording.cancel();
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(content: Text(L10n.of(context).voiceRecordingTooShort)),
-      );
+      AppToast.show(L10n.of(context).voiceRecordingTooShort);
       return;
     }
     await recording.stopAndSend(controller.onVoiceMessageSend);
@@ -252,6 +256,7 @@ class _ChatInputRowState extends State<ChatInputRow> {
 
   @override
   void dispose() {
+    if (AppToast.composerKey == _composerKey) AppToast.composerKey = null;
     _maxDurationTimer?.cancel();
     _hideRecordingOverlay(immediate: true);
     _overlayVisible.dispose();

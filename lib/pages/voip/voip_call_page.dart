@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/voip/loading_dots.dart';
 import 'package:fluffychat/utils/voip/matrix_voip.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
@@ -259,9 +260,7 @@ class _VoipCallPageState extends State<VoipCallPage> {
   }
 
   void _showVideoUnsupported() {
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(content: Text(L10n.of(context).callVideoSwitchUnavailable)),
-    );
+    AppToast.show(L10n.of(context).callVideoSwitchUnavailable);
   }
 
   // ---------------------------------------------------------------------------

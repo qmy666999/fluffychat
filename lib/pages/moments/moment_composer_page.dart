@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/file_selector.dart';
 import 'package:fluffychat/utils/moments/moments_service.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -65,9 +66,7 @@ class _MomentComposerPageState extends State<MomentComposerPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _publishing = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      AppToast.show(e.toString());
     }
   }
 

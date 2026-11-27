@@ -7,6 +7,7 @@ import 'dart:async';
 
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/invitation_selection/invitation_selection_view.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:material_ui/material_ui.dart';
@@ -60,7 +61,6 @@ class InvitationSelectionController extends State<InvitationSelection> {
     String displayname,
   ) async {
     final l10n = L10n.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final room = Matrix.of(context).client.getRoomById(roomId!)!;
 
     final success = await showFutureLoadingDialog(
@@ -69,9 +69,7 @@ class InvitationSelectionController extends State<InvitationSelection> {
     );
     if (success.error == null) {
       if (!context.mounted) return;
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text(l10n.contactHasBeenInvitedToTheGroup)),
-      );
+      AppToast.show(l10n.contactHasBeenInvitedToTheGroup);
     }
   }
 
@@ -98,9 +96,7 @@ class InvitationSelectionController extends State<InvitationSelection> {
       response = await matrix.client.searchUserDirectory(text, limit: 10);
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text((e).toLocalizedString(context))));
+      AppToast.show((e).toLocalizedString(context));
       return;
     } finally {
       setState(() => loading = false);

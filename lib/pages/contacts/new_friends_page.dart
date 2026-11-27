@@ -4,6 +4,7 @@
 
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
@@ -29,9 +30,7 @@ class _NewFriendsPageState extends State<NewFriendsPage> {
       context.go('/rooms/$roomId');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(L10n.of(context).openChatFailed(e.toString()))),
-      );
+      AppToast.show(L10n.of(context).openChatFailed(e.toString()));
     }
   }
 

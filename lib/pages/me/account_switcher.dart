@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:material_ui/material_ui.dart';
@@ -127,9 +128,7 @@ class _AccountSwitcherSheetState extends State<_AccountSwitcherSheet> {
         _busy = false;
         if (me != null) _loggedOut.remove(me);
       });
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(content: Text(L10n.of(context).oopsSomethingWentWrong)),
-      );
+      AppToast.show(L10n.of(context).oopsSomethingWentWrong);
       return;
     }
     if (!mounted) return;

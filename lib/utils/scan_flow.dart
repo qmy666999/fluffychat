@@ -5,6 +5,7 @@
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/new_private_chat/qr_scanner_modal.dart';
 import 'package:fluffychat/utils/matrix_qr.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -35,9 +36,7 @@ Future<void> startMatrixScan(BuildContext context) async {
         context.go('/rooms/$roomId');
       } catch (e) {
         if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.scanJoinFailed(e.toString()))),
-        );
+        AppToast.show(l10n.scanJoinFailed(e.toString()));
       }
       break;
     case MatrixQrType.alias:
@@ -50,15 +49,11 @@ Future<void> startMatrixScan(BuildContext context) async {
         context.go('/rooms/$roomId');
       } catch (e) {
         if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.scanJoinFailed(e.toString()))),
-        );
+        AppToast.show(l10n.scanJoinFailed(e.toString()));
       }
       break;
     case MatrixQrType.unknown:
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.scanInvalidQr)));
+      AppToast.show(l10n.scanInvalidQr);
       break;
   }
 }

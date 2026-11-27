@@ -13,6 +13,7 @@ import 'package:fluffychat/utils/adaptive_bottom_sheet.dart';
 import 'package:fluffychat/utils/fluffy_share.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/url_launcher.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
@@ -87,14 +88,11 @@ class NewPrivateChatController extends State<NewPrivateChat> {
 
   Future<void> openScannerAction() async {
     final l10n = L10n.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     if (PlatformInfos.isAndroid) {
       final info = await DeviceInfoPlugin().androidInfo;
       if (!mounted) return;
       if (info.version.sdkInt < 21) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(content: Text(l10n.unsupportedAndroidVersionLong)),
-        );
+        AppToast.show(l10n.unsupportedAndroidVersionLong);
         return;
       }
     }
@@ -108,15 +106,12 @@ class NewPrivateChatController extends State<NewPrivateChat> {
   }
 
   Future<void> copyUserId() async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final l10n = L10n.of(context);
     await Clipboard.setData(
       ClipboardData(text: Matrix.of(context).client.userID!),
     );
     if (!mounted) return;
-    scaffoldMessenger.showSnackBar(
-      SnackBar(content: Text(l10n.copiedToClipboard)),
-    );
+    AppToast.show(l10n.copiedToClipboard);
   }
 
   void openUserModal(Profile profile) =>

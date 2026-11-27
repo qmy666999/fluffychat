@@ -9,6 +9,7 @@ import 'package:chewie/chewie.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/blur_hash.dart';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
@@ -99,9 +100,7 @@ class EventVideoPlayerState extends State<EventVideoPlayer> {
       });
     } on IOException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toLocalizedString(context))));
+      AppToast.show(e.toLocalizedString(context));
     } catch (e, s) {
       if (!mounted) return;
       ErrorReporter(context, 'Unable to play video').onErrorCallback(e, s);

@@ -12,6 +12,7 @@ import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/adaptive_dialog_action.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_modal_action_popup.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -84,9 +85,7 @@ class SettingsNotificationsController extends State<SettingsNotifications> {
     } catch (e, s) {
       Logs().w('Unable to toggle push rule', e, s);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toLocalizedString(context))));
+      AppToast.show(e.toLocalizedString(context));
     } finally {
       if (mounted) {
         setState(() {
@@ -168,9 +167,7 @@ class SettingsNotificationsController extends State<SettingsNotifications> {
         } catch (e, s) {
           Logs().w('Unable to delete push rule', e, s);
           if (!mounted) return;
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(e.toLocalizedString(context))));
+          AppToast.show(e.toLocalizedString(context));
         } finally {
           if (mounted) {
             setState(() {

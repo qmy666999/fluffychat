@@ -5,6 +5,7 @@
 import 'package:fluffychat/config/server_endpoints.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/server_probe.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -25,7 +26,6 @@ class ServerEndpointTileState extends State<ServerEndpointTile> {
     if (_busy) return;
     setState(() => _busy = true);
     final l10n = L10n.of(context);
-    final messenger = ScaffoldMessenger.of(context);
     final clients = Matrix.of(context).widget.clients;
     try {
       await pickFastestServer();
@@ -38,16 +38,12 @@ class ServerEndpointTileState extends State<ServerEndpointTile> {
     }
     if (!mounted) return;
     final host = ServerEndpoints.uri.host;
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          ServerEndpoints.reachable
-              ? ServerEndpoints.isLan
-                    ? l10n.serverEndpointLan(host)
-                    : l10n.serverEndpointWan(host)
-              : l10n.serverEndpointOffline,
-        ),
-      ),
+    AppToast.show(
+      ServerEndpoints.reachable
+          ? ServerEndpoints.isLan
+                ? l10n.serverEndpointLan(host)
+                : l10n.serverEndpointWan(host)
+          : l10n.serverEndpointOffline,
     );
   }
 

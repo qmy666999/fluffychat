@@ -11,6 +11,7 @@ import 'package:fluffychat/utils/file_selector.dart';
 import 'package:fluffychat/utils/moments/moments_service.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
@@ -135,9 +136,7 @@ class _MomentsPageState extends State<MomentsPage> {
         _loading = false;
       });
       if (pull) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(L10n.of(context).refreshFailed)));
+        AppToast.show(L10n.of(context).refreshFailed);
       }
     }
   }
@@ -221,9 +220,7 @@ class _MomentsPageState extends State<MomentsPage> {
       await _refresh();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      AppToast.show(e.toString());
     }
   }
 
@@ -240,9 +237,7 @@ class _MomentsPageState extends State<MomentsPage> {
       await _refresh();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      AppToast.show(e.toString());
     }
   }
 
@@ -482,14 +477,10 @@ class _MomentsPageState extends State<MomentsPage> {
       setState(() => _cover = cover);
     } on UnsupportedAvatarFormat {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.avatarUnsupportedFormat)));
+      AppToast.show(l10n.avatarUnsupportedFormat);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      AppToast.show(e.toString());
     }
   }
 }

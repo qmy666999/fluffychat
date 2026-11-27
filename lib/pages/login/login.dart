@@ -10,6 +10,7 @@ import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
@@ -186,7 +187,6 @@ class LoginController extends State<Login> {
 
   Future<void> passwordForgotten() async {
     final l10n = L10n.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final input = await showTextInputDialog(
       useRootNavigator: false,
       context: context,
@@ -257,9 +257,7 @@ class LoginController extends State<Login> {
     );
     if (!mounted) return;
     if (success.error == null) {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text(l10n.passwordHasBeenChanged)),
-      );
+      AppToast.show(l10n.passwordHasBeenChanged);
       usernameController.text = input;
       passwordController.text = password;
       login();

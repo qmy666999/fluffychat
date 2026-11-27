@@ -11,6 +11,7 @@ import 'package:fluffychat/utils/matrix_live_kit_calls/matrix_live_kit_call.dart
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 import 'package:fluffychat/utils/room_status_extension.dart';
 import 'package:fluffychat/utils/wechat/redaction_preview.dart';
+import 'package:fluffychat/utils/wechat/remark_service.dart';
 import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:fluffychat/widgets/hover_builder.dart';
 import 'package:fluffychat/widgets/typing_animation.dart';
@@ -55,13 +56,28 @@ class ChatListItem extends StatelessWidget {
     final backgroundColor = activeChat
         ? theme.colorScheme.secondaryContainer
         : null;
-    // 两人会话一律显示对方昵称（微信语义），不要露出房间名。
+    // 两人会话一律显示对方昵称（微信语义），不要露出房间名；备注优先。
+    final peerId = isDirectChat ? singlePeerUserId(room) : null;
+    final peerName = isDirectChat ? singlePeerDisplayname(room) : null;
+    final roomName = room.getLocalizedDisplayname(
+      MatrixLocals(L10n.of(context)),
+    );
     final displayname =
-        (isDirectChat ? singlePeerDisplayname(room) : null) ??
-        room.getLocalizedDisplayname(MatrixLocals(L10n.of(context)));
+        (peerId == null ? null : RemarkService(room.client).remarkOf(peerId)) ??
+        peerName ??
+        roomName;
     final filter = this.filter;
-    if (filter != null && !displayname.toLowerCase().contains(filter)) {
-      return const SizedBox.shrink();
+    if (filter != null) {
+      // 备注和原昵称都要能搜到。
+      final haystack = [
+        displayname,
+        peerName,
+        roomName,
+        peerId,
+      ].whereType<String>().join(' ').toLowerCase();
+      if (!haystack.contains(filter.toLowerCase())) {
+        return const SizedBox.shrink();
+      }
     }
 
     final space = this.space;
