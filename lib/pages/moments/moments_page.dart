@@ -57,19 +57,33 @@ class _MomentsPageState extends State<MomentsPage> {
 
   Future<void> _refresh({bool pull = false}) async {
     final startedAt = DateTime.now();
-    final userId = Matrix.of(context).client.userID ?? '';
+    final client = Matrix.of(context).client;
+    final userId = client.userID ?? '';
     try {
       final room = _service.room ?? await _service.ensureRoom();
       _room = room;
-      final timeline = await room.getTimeline(
-        limit: 20,
-        onNewEvent: () {
-          if (mounted) setState(() {});
-        },
-        onUpdate: () {
-          if (mounted) setState(() {});
-        },
-      );
+      // 只创建一次 timeline。下拉刷新**绝对不能重建**：重建等于只保留第一页，
+      // 已经翻出来的历史会被丢掉，看起来就是「刷新后下面的内容消失了」。
+      var timeline = _timeline;
+      if (timeline == null) {
+        timeline = await room.getTimeline(
+          limit: 40,
+          onNewEvent: () {
+            if (mounted) setState(() {});
+          },
+          onUpdate: () {
+            if (mounted) setState(() {});
+          },
+        );
+        _timeline = timeline;
+      } else if (pull) {
+        // 已有的 timeline 靠 sync 收新事件，这里主动同步一次，保证拿到最新的。
+        try {
+          await client.sync(timeout: 5000);
+        } catch (e) {
+          debugPrint('[moments] sync failed: $e');
+        }
+      }
       unawaited(_service.inviteMissingFriends(room));
       // 旧封面（账号数据/状态事件）迁成自己的普通消息事件。
       unawaited(_service.migrateLegacyCover());
@@ -87,9 +101,27 @@ class _MomentsPageState extends State<MomentsPage> {
           await Future.delayed(const Duration(milliseconds: 600) - elapsed);
         }
       }
+      // 首屏动态太少（一页事件里可能只有几条动态）就继续往下补几页，
+      // 不然会出现「只显示 4 条 + 底部已经写着没有更多了」。
+      var topUp = 0;
+      while (MomentsService.momentEvents(timeline.events).length < 10 &&
+          timeline.canRequestHistory &&
+          topUp++ < 5) {
+        try {
+          await timeline.requestHistory(historyCount: 40);
+        } catch (e) {
+          debugPrint('[moments] top up failed: $e');
+          break;
+        }
+      }
+      _hasMore = timeline.canRequestHistory;
+      debugPrint(
+        '[moments] page: events=${timeline.events.length} '
+        'moments=${MomentsService.momentEvents(timeline.events).length} '
+        'hasMore=$_hasMore',
+      );
       if (!mounted) return;
       setState(() {
-        _timeline = timeline;
         _cover = cover;
         _loading = false;
         _error = null;
@@ -98,8 +130,8 @@ class _MomentsPageState extends State<MomentsPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        // 刷新失败不要把已有动态清掉，只提示。
-        _error = e.toString();
+        // 刷新失败不要把已有动态清掉：只有一条都没有时才显示错误。
+        if (_timeline == null) _error = e.toString();
         _loading = false;
       });
       if (pull) {
