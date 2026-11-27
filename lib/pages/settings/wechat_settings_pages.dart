@@ -310,6 +310,14 @@ class _SettingsChatPageState extends State<SettingsChatPage> {
           }),
         ),
         SwitchListTile.adaptive(
+          title: Text(l10n.sendOriginalImages),
+          subtitle: Text(l10n.sendOriginalImagesHint),
+          value: WechatPrefs.sendOriginalImages,
+          onChanged: (value) => setState(() {
+            WechatPrefs.setSendOriginalImages(value);
+          }),
+        ),
+        SwitchListTile.adaptive(
           // 关掉「显示撤回提示」= 撤回后彻底消失（微信默认行为）
           title: Text(l10n.showRedactedMessages),
           subtitle: Text(l10n.showRedactedMessagesHint),

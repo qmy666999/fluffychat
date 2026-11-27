@@ -55,6 +55,18 @@ class WechatPrefs {
     await _store?.setStringList(_discoverHiddenKey, current.toList());
   }
 
+  // ------------------------------------------------------------ 图片发送
+
+  static const String _sendOriginalImagesKey = 'wechat_send_original_images';
+
+  /// 发送原图：打开后不再压缩图片，直接上传原始文件（很慢，慎用）。
+  static bool get sendOriginalImages =>
+      _store?.getBool(_sendOriginalImagesKey) ?? false;
+
+  static Future<void> setSendOriginalImages(bool value) async {
+    await _store?.setBool(_sendOriginalImagesKey, value);
+  }
+
   // ------------------------------------------------------------ 消息提醒
 
   static const String _notifyReceiveKey = 'wechat_notify_receive';

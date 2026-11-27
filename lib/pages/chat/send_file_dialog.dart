@@ -15,11 +15,12 @@ import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat/image_edit_geometry.dart';
 import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_file_extension.dart';
+import 'package:fluffychat/utils/media/image_compressor.dart';
 import 'package:fluffychat/utils/other_party_can_receive.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/show_scaffold_dialog.dart';
 import 'package:fluffychat/utils/size_string.dart';
-import 'package:fluffychat/utils/start_push_foreground_service.dart';
+import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/adaptive_dialog_action.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/dialog_text_field.dart';
 import 'package:fluffychat/widgets/app_toast.dart';
@@ -49,7 +50,23 @@ class SendFileDialog extends StatefulWidget {
 }
 
 class SendFileDialogState extends State<SendFileDialog> {
-  bool compress = true;
+  /// True while the upload loop is running.
+  bool _sending = false;
+
+  /// Set by the cancel action, the loop stops after the current file.
+  bool _cancelRequested = false;
+
+  /// Number of files that finished uploading.
+  int _sentCount = 0;
+
+  /// Name of the file that is currently uploading.
+  String? _sendingName;
+
+  /// Last error, kept visible in the dialog so it is not missed.
+  String? _errorText;
+
+  /// The "send original images" setting turns compression off by default.
+  late bool compress = !WechatPrefs.sendOriginalImages;
 
   /// Images smaller than 20kb don't need compression.
   static const int minSizeToCompress = 20 * 1000;
@@ -83,7 +100,12 @@ class SendFileDialogState extends State<SendFileDialog> {
     });
   }
 
+  /// Uploads the selected files one by one.
+  ///
+  /// Every failure has to be reported to the user: a silently swallowed
+  /// exception used to look like "nothing happens after tapping send".
   Future<void> _send(String? uniqueFileType) async {
+    if (_sending) return;
     final l10n = L10n.of(context);
 
     final proceed = await showTrustUserInRoomDialog(
@@ -92,55 +114,66 @@ class SendFileDialogState extends State<SendFileDialog> {
     );
     if (!context.mounted || !proceed) return;
 
-    if (ForegroundServices.platformSupported) {
-      await ForegroundServices.startService('send_files');
-    } else {
-      _showLoadingToast(l10n.sendingFilesDoNotExit(widget.files.length));
-    }
+    setState(() {
+      _sending = true;
+      _cancelRequested = false;
+      _sentCount = 0;
+      _sendingName = null;
+      _errorText = null;
+    });
+
+    final total = _files.length;
     try {
       if (!widget.room.otherPartyCanReceiveMessages) {
         throw OtherPartyCanNotReceiveMessages();
       }
-      if (!mounted) return;
-      Navigator.of(context, rootNavigator: false).pop();
+
       final clientConfig = await Result.capture(widget.room.client.getConfig());
       final maxUploadSize =
           clientConfig.asValue?.value.mUploadSize ?? 100 * 1000 * 1000;
 
-      for (var i = 0; i < _files.length; i++) {
-        final xfile = _files[i];
-        final MatrixFile file;
-        MatrixImageFile? thumbnail;
-        final mimeType = xfile.mimeType ?? lookupMimeType(xfile.path);
+      for (var i = 0; i < total; i++) {
+        if (_cancelRequested) break;
+        if (!mounted) return;
+        setState(() => _sendingName = _files[i].name);
 
-        // Generate video thumbnail
+        final xfile = _files[i];
+        final mimeType = xfile.mimeType ?? lookupMimeType(xfile.path);
+        MatrixImageFile? thumbnail;
+        MatrixFile file;
+
         if (PlatformInfos.isMobile &&
             mimeType != null &&
             mimeType.startsWith('video')) {
           thumbnail = await xfile.getVideoThumbnail();
-        }
-
-        // If file is a video, shrink it!
-        if (PlatformInfos.isMobile &&
-            mimeType != null &&
-            mimeType.startsWith('video')) {
           final lengthResult = await Result.capture(xfile.length());
           final length = lengthResult.asValue?.value;
-          AppToast.dismiss();
-          _showLoadingToast(l10n.compressingVideo);
           file = await xfile.getVideoInfo(
             compress: length != null && length > minSizeToCompress && compress,
           );
-          AppToast.dismiss();
-          if (!ForegroundServices.platformSupported) {
-            _showLoadingToast(l10n.sendingFilesDoNotExit(widget.files.length));
-          }
         } else {
-          // Else we just create a MatrixFile
+          var bytes = await _files[i].readAsBytes();
+          if (bytes.isEmpty) throw _EmptyFileException(xfile.name);
+
+          var name = xfile.name;
+          var detectedMime = mimeType;
+          if (compress &&
+              mimeType != null &&
+              mimeType.startsWith('image') &&
+              mimeType != 'image/gif') {
+            final compressed = await ImageCompressor.compress(bytes);
+            if (compressed != null && compressed.length < bytes.length) {
+              bytes = compressed;
+              detectedMime = 'image/jpeg';
+              final dot = name.lastIndexOf('.');
+              if (dot > 0) name = '${name.substring(0, dot)}.jpg';
+            }
+          }
+
           file = MatrixFile(
-            bytes: await _files[i].readAsBytes(),
-            name: xfile.name,
-            mimeType: mimeType,
+            bytes: bytes,
+            name: name,
+            mimeType: detectedMime,
           ).detectFileType;
         }
 
@@ -149,44 +182,95 @@ class SendFileDialogState extends State<SendFileDialog> {
         }
 
         final label = _labelTextController.text.trim();
+        await _uploadWithRetry(file, thumbnail: thumbnail, label: label);
 
-        try {
-          await widget.room.sendFileEvent(
-            file,
-            thumbnail: thumbnail,
-            shrinkImageMaxDimension: compress ? 1600 : null,
-            extraContent: label.isEmpty ? null : {'body': label},
-            threadRootEventId: widget.threadRootEventId,
-            threadLastEventId: widget.threadLastEventId,
-          );
-        } on MatrixException catch (e) {
-          final retryAfterMs = e.retryAfterMs;
-          if (e.error != MatrixError.M_LIMIT_EXCEEDED || retryAfterMs == null) {
-            rethrow;
-          }
-          final retryAfterDuration = Duration(
-            milliseconds: retryAfterMs + 1000,
-          );
-
-          await Future.delayed(retryAfterDuration);
-
-          await widget.room.sendFileEvent(
-            file,
-            thumbnail: thumbnail,
-            shrinkImageMaxDimension: compress ? 1600 : null,
-            extraContent: label.isEmpty ? null : {'body': label},
-          );
-        }
+        if (mounted) setState(() => _sentCount = i + 1);
       }
-    } finally {
-      if (ForegroundServices.platformSupported) {
-        await ForegroundServices.stopService('send_files');
-      } else {
-        AppToast.dismiss();
+
+      if (!mounted) return;
+      if (_cancelRequested) {
+        Navigator.of(context, rootNavigator: false).pop();
+        AppToast.show(l10n.sendingCancelled);
+        return;
       }
+
+      Navigator.of(context, rootNavigator: false).pop();
+      AppToast.show(l10n.filesSent);
+    } catch (e, s) {
+      Logs().w('[send_file] sending failed', e, s);
+      final message = _describeSendError(e, l10n);
+      if (!mounted) {
+        AppToast.show(message, isError: true);
+        return;
+      }
+      setState(() {
+        _sending = false;
+        _cancelRequested = false;
+        _errorText = message;
+      });
+      AppToast.show(message, isError: true);
     }
+  }
 
-    return;
+  Future<void> _uploadWithRetry(
+    MatrixFile file, {
+    MatrixImageFile? thumbnail,
+    String? label,
+  }) async {
+    Future<void> send() => widget.room.sendFileEvent(
+      file,
+      thumbnail: thumbnail,
+      shrinkImageMaxDimension: compress ? 1600 : null,
+      extraContent: (label == null || label.isEmpty) ? null : {'body': label},
+      threadRootEventId: widget.threadRootEventId,
+      threadLastEventId: widget.threadLastEventId,
+    );
+
+    try {
+      await send();
+    } on MatrixException catch (e) {
+      final retryAfterMs = e.retryAfterMs;
+      if (e.error != MatrixError.M_LIMIT_EXCEEDED || retryAfterMs == null) {
+        rethrow;
+      }
+      await Future.delayed(Duration(milliseconds: retryAfterMs + 1000));
+      await send();
+    }
+  }
+
+  String _describeSendError(Object error, L10n l10n) {
+    if (error is FileTooBigMatrixException) {
+      final size = (error.actualFileSize / (1000 * 1000)).toStringAsFixed(1);
+      final max = (error.maxFileSize / (1000 * 1000)).toStringAsFixed(0);
+      return l10n.fileTooBigError(size, max);
+    }
+    if (error is _EmptyFileException) {
+      return l10n.fileIsEmptyError(error.fileName);
+    }
+    if (error is OtherPartyCanNotReceiveMessages) {
+      return l10n.otherPartyCanNotReceiveMessages;
+    }
+    if (error is MatrixException) {
+      if (error.response?.statusCode == 413 ||
+          error.error == MatrixError.M_TOO_LARGE) {
+        return l10n.fileTooBigByServer;
+      }
+      return l10n.sendFileFailedError(error.errorMessage);
+    }
+    final text = error.toString();
+    if (text.contains('SocketException') ||
+        text.contains('Failed host lookup') ||
+        text.contains('TimeoutException') ||
+        text.contains('Connection reset') ||
+        text.contains('Connection closed')) {
+      return l10n.sendFileNetworkError;
+    }
+    return l10n.sendFileFailedError(text);
+  }
+
+  void _cancelSending() {
+    if (!_sending) return;
+    setState(() => _cancelRequested = true);
   }
 
   Future<String> _calcCombinedFileSize() async {
@@ -250,6 +334,48 @@ class SendFileDialogState extends State<SendFileDialog> {
                 mainAxisSize: .min,
                 children: [
                   const SizedBox(height: 12),
+                  if (_sending || _errorText != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Column(
+                        mainAxisSize: .min,
+                        crossAxisAlignment: .start,
+                        children: [
+                          if (_sending)
+                            LinearProgressIndicator(
+                              value: _files.isEmpty
+                                  ? null
+                                  : _sentCount / _files.length,
+                              minHeight: 4,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          if (_sending) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              L10n.of(context).sendingProgress(
+                                '$_sentCount',
+                                '${_files.length}',
+                              ),
+                              style: theme.textTheme.labelMedium,
+                            ),
+                            if (_sendingName != null)
+                              Text(
+                                _sendingName!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall,
+                              ),
+                          ],
+                          if (_errorText != null)
+                            Text(
+                              _errorText!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.error,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   if (uniqueFileType == 'image')
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16.0),
@@ -458,12 +584,17 @@ class SendFileDialogState extends State<SendFileDialog> {
           ),
           actions: <Widget>[
             AdaptiveDialogAction(
-              onPressed: () =>
-                  Navigator.of(context, rootNavigator: false).pop(),
-              child: Text(L10n.of(context).cancel),
+              onPressed: _sending
+                  ? _cancelSending
+                  : () => Navigator.of(context, rootNavigator: false).pop(),
+              child: Text(
+                _sending
+                    ? L10n.of(context).stopSending
+                    : L10n.of(context).cancel,
+              ),
             ),
             AdaptiveDialogAction(
-              onPressed: () => _send(uniqueFileType),
+              onPressed: _sending ? null : () => _send(uniqueFileType),
               child: Text(L10n.of(context).send),
             ),
           ],
@@ -931,23 +1062,6 @@ class _ImageEditPageState extends State<_ImageEditPage> {
   }
 }
 
-/// 上传 / 压缩的进度提示：不是轻提示，所以一直挂着，直到 [AppToast.dismiss]。
-void _showLoadingToast(String title) {
-  AppToast.showCustom(
-    Row(
-      mainAxisSize: MainAxisSize.min,
-      spacing: 8,
-      children: [
-        Flexible(child: Text(title, overflow: .ellipsis, maxLines: 1)),
-        SizedBox.square(
-          dimension: 14,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      ],
-    ),
-  );
-}
-
 /// Freehand drawing surface with pinch-to-zoom.
 ///
 /// This is a widget class (not a helper method on the parent state) so it gets
@@ -1196,4 +1310,15 @@ class _StrokePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _StrokePainter oldDelegate) => true;
+}
+
+/// Thrown when a picked file cannot be read (0 bytes), for example because the
+/// content uri expired. Sending an empty file would look like a broken upload.
+class _EmptyFileException implements Exception {
+  const _EmptyFileException(this.fileName);
+
+  final String fileName;
+
+  @override
+  String toString() => 'EmptyFileException($fileName)';
 }

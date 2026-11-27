@@ -43,6 +43,15 @@ Future<void> showMessageActionsMenu(
       event.messageType == MessageTypes.Emote;
 
   final actions = <_MessageAction>[
+    // 正在上传的消息允许停下：否则慢速网络下只能干等
+    if (isOwn && event.status.isSending)
+      _MessageAction(
+        icon: Icons.close_outlined,
+        label: l10n.stopSending,
+        onTap: () async {
+          await event.cancelSend();
+        },
+      ),
     if (event.status.isError)
       _MessageAction(
         icon: Icons.refresh,

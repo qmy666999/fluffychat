@@ -3239,4 +3239,50 @@
   "remarkOnlyYouCanSee": "Only visible to you. The other person is not notified.",
   "nicknameLabel": "Nickname: {name}",
   "@nicknameLabel": {"placeholders": {"name": {"type": "String"}}}
+,
+  "fileTooBigError": "File too large: {size} MB, the server allows up to {max} MB",
+    "@fileTooBigError": {
+      "placeholders": {
+        "size": {"type": "String"},
+        "max": {"type": "String"}
+      }
+    }
+,
+  "fileTooBigByServer": "The file exceeds the size allowed by the server"
+,
+  "fileIsEmptyError": "Could not read the file: {name}",
+    "@fileIsEmptyError": {
+      "placeholders": {
+        "name": {"type": "String"}
+      }
+    }
+,
+  "otherPartyCanNotReceiveMessages": "The other party cannot receive messages right now"
+,
+  "sendFileFailedError": "Sending failed: {error}",
+    "@sendFileFailedError": {
+      "placeholders": {
+        "error": {"type": "String"}
+      }
+    }
+,
+  "sendFileNetworkError": "Network problem, sending failed. Please check your connection."
+,
+  "sendingCancelled": "Sending cancelled"
+,
+  "filesSent": "Sent"
+,
+  "sendingProgress": "Sending {current}/{total}…",
+    "@sendingProgress": {
+      "placeholders": {
+        "current": {"type": "String"},
+        "total": {"type": "String"}
+      }
+    }
+,
+  "stopSending": "Stop"
+,
+  "sendOriginalImages": "Send original images"
+,
+  "sendOriginalImagesHint": "Uploads the full size image, which is much slower"
 }
