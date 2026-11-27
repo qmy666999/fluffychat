@@ -191,25 +191,59 @@ _StaticResult? _compressStatic(_StaticArguments args) {
           );
   }
 
-  if (args.keepAlpha) {
-    return _StaticResult(
-      bytes: img.encodePng(image, level: 6),
-      mimetype: 'image/png',
-      width: image.width,
-      height: image.height,
-    );
+  // 只有真的带透明通道才坚持 PNG；不透明图走 JPG，体积小很多。
+  final keepAlpha = args.keepAlpha && image.numChannels == 4;
+  for (final scale in const [1.0, 0.85, 0.72, 0.6, 0.5, 0.4, 0.32]) {
+    final current = scale >= 1.0
+        ? image
+        : img.copyResize(
+            image,
+            width: (image.width * scale).round().clamp(16, image.width),
+            height: (image.height * scale).round().clamp(16, image.height),
+            interpolation: img.Interpolation.average,
+          );
+
+    if (keepAlpha) {
+      final png = img.encodePng(current, level: 9);
+      if (png.length <= args.maxBytes) {
+        return _StaticResult(
+          bytes: png,
+          mimetype: 'image/png',
+          width: current.width,
+          height: current.height,
+        );
+      }
+      continue;
+    }
+
+    var quality = 85;
+    var encoded = img.encodeJpg(current, quality: quality);
+    while (encoded.length > args.maxBytes &&
+        quality > StickerImage._minQuality) {
+      quality -= 10;
+      encoded = img.encodeJpg(current, quality: quality);
+    }
+    if (encoded.length <= args.maxBytes) {
+      return _StaticResult(
+        bytes: encoded,
+        mimetype: 'image/jpeg',
+        width: current.width,
+        height: current.height,
+      );
+    }
   }
 
-  var quality = 85;
-  var encoded = img.encodeJpg(image, quality: quality);
-  while (encoded.length > args.maxBytes && quality > StickerImage._minQuality) {
-    quality -= 10;
-    encoded = img.encodeJpg(image, quality: quality);
-  }
+  // 兜底：极小尺寸的 JPG，保证一定落在上限内（丢掉透明，但不会超限）。
+  final tiny = img.copyResize(
+    image,
+    width: (image.width * 0.25).round().clamp(16, image.width),
+    height: (image.height * 0.25).round().clamp(16, image.height),
+    interpolation: img.Interpolation.average,
+  );
   return _StaticResult(
-    bytes: encoded,
+    bytes: img.encodeJpg(tiny, quality: StickerImage._minQuality),
     mimetype: 'image/jpeg',
-    width: image.width,
-    height: image.height,
+    width: tiny.width,
+    height: tiny.height,
   );
 }
