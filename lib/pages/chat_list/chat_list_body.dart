@@ -18,6 +18,7 @@ import 'package:fluffychat/utils/stream_extension.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/public_room_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/animations/tap_scale.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -225,8 +226,10 @@ class ChatListViewBody extends StatelessWidget {
                                     await room.setReadMarker(
                                       room.lastEvent?.eventId,
                                     );
+                                    AppToast.show(l10n.toastMarkedAsRead);
                                   } else {
                                     await room.markUnread(true);
+                                    AppToast.show(l10n.toastMarkedAsUnread);
                                   }
                                 },
                               ),
@@ -244,6 +247,7 @@ class ChatListViewBody extends StatelessWidget {
                                   );
                                   if (result != OkCancelResult.ok) return;
                                   RoomCollapse.collapse(room.id, room.forget);
+                                  AppToast.show(l10n.toastChatDeleted);
                                 },
                               ),
                             ],

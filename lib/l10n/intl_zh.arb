@@ -3285,4 +3285,24 @@
   "sendOriginalImages": "发送原图"
 ,
   "sendOriginalImagesHint": "打开后图片不再压缩，上传会慢很多"
+,
+  "toastMarkedAsUnread": "已标为未读"
+,
+  "toastMarkedAsRead": "已标为已读"
+,
+  "toastChatPinned": "已置顶"
+,
+  "toastChatUnpinned": "已取消置顶"
+,
+  "toastChatDeleted": "已删除"
+,
+  "toastAccountSwitched": "已切换账号"
+,
+  "toastSavedToGallery": "已保存到相册"
+,
+  "toastSaveFailed": "保存失败"
+,
+  "toastMuteOn": "已开启免打扰"
+,
+  "toastMuteOff": "已关闭免打扰"
 }

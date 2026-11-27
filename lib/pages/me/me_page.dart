@@ -5,6 +5,7 @@
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list_bottom_bar.dart';
 import 'package:fluffychat/pages/me/account_switcher.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
@@ -50,6 +51,7 @@ class _MePageState extends State<MePage> {
     }
     // 切了账号：整页按新 client 重新取资料。
     setState(() {});
+    AppToast.show(L10n.of(context).toastAccountSwitched);
   }
 
   @override

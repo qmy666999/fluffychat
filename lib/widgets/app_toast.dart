@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:fluffychat/widgets/fluffy_chat_app.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:matrix/matrix.dart' show Logs;
 
 /// 胶囊轻提示。
 ///
@@ -46,11 +47,13 @@ class AppToast {
   /// 底部四项导航栏注册的锚点（由 `ChatListBottomBar` 设置）。
   static GlobalKey? bottomBarKey;
 
-  /// 顶部安全区，胶囊往下让一点，避免贴着状态栏。
-  static const double _topInset = 72;
-
-  static BuildContext? get _rootContext =>
-      FluffyChatApp.router.routerDelegate.navigatorKey.currentContext;
+  /// 根 Navigator 的 Overlay。
+  ///
+  /// 注意：不能用 `Overlay.maybeOf(navigatorKey.currentContext)`——那个 context
+  /// 是 Navigator 自己，Overlay 是它的**子节点**，向上查找永远拿不到，于是提示
+  /// 全部静默丢掉（1.19.0 的 bug）。这里直接取 `NavigatorState.overlay`。
+  static OverlayState? get _rootOverlay =>
+      FluffyChatApp.router.routerDelegate.navigatorKey.currentState?.overlay;
 
   /// 弹一条文字提示。
   static void show(
@@ -72,10 +75,11 @@ class AppToast {
   }
 
   static void _show({required Widget child, Duration? duration}) {
-    final context = _rootContext;
-    if (context == null) return;
-    final overlay = Overlay.maybeOf(context, rootOverlay: true);
-    if (overlay == null) return;
+    final overlay = _rootOverlay;
+    if (overlay == null) {
+      Logs().w('[AppToast] no root overlay, dropped');
+      return;
+    }
 
     // 只保留一条：新的直接顶掉旧的。
     _dismiss(immediate: true);
@@ -150,16 +154,27 @@ class AppToast {
       return top;
     }
 
+    final maxBottom = height - 200;
+    final minBottom = maxBottom > 60 ? 60.0 : 0.0;
+
+    double clampBottom(double value) =>
+        value.clamp(minBottom, maxBottom > minBottom ? maxBottom : minBottom);
+
     final composerTop = topOf(composerKey);
     if (composerTop != null) {
-      return (height - composerTop + 12).clamp(_topInset, height - _topInset);
+      final bottom = height - composerTop + 12;
+      Logs().v('[AppToast] bottom=$bottom composer=$composerTop');
+      return clampBottom(bottom);
     }
     final barTop = topOf(bottomBarKey);
     if (barTop != null) {
-      return (height - barTop + 12).clamp(_topInset, height - _topInset);
+      final bottom = height - barTop + 12;
+      Logs().v('[AppToast] bottom=$bottom bottombar=$barTop');
+      return clampBottom(bottom);
     }
     // 没有输入栏也没有底部导航栏：距屏幕底 80dp。
-    return 80;
+    Logs().v('[AppToast] bottom=80 (no anchor)');
+    return clampBottom(80);
   }
 
   /// 提示条上那个按钮（例如「返回通话」）。

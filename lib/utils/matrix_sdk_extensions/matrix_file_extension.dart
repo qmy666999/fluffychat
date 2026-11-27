@@ -14,15 +14,19 @@ import 'package:share_plus/share_plus.dart';
 extension MatrixFileExtension on MatrixFile {
   Future<void> save(BuildContext context) async {
     final l10n = L10n.of(context);
-    final downloadPath = await FilePicker.saveFile(
-      dialogTitle: l10n.saveFile,
-      fileName: name,
-      mimeType: mimeType,
-      bytes: bytes,
-    );
-    if (downloadPath == null) return;
-
-    AppToast.show(l10n.fileHasBeenSavedAt(downloadPath.toString()));
+    try {
+      final downloadPath = await FilePicker.saveFile(
+        dialogTitle: l10n.saveFile,
+        fileName: name,
+        mimeType: mimeType,
+        bytes: bytes,
+      );
+      if (downloadPath == null) return;
+      AppToast.show(l10n.toastSavedToGallery);
+    } catch (e, s) {
+      Logs().w('[file] save failed', e, s);
+      AppToast.show(l10n.toastSaveFailed, isError: true);
+    }
   }
 
   FileType get filePickerFileType {

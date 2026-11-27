@@ -3285,4 +3285,24 @@
   "sendOriginalImages": "Send original images"
 ,
   "sendOriginalImagesHint": "Uploads the full size image, which is much slower"
+,
+  "toastMarkedAsUnread": "Marked as unread"
+,
+  "toastMarkedAsRead": "Marked as read"
+,
+  "toastChatPinned": "Chat pinned"
+,
+  "toastChatUnpinned": "Chat unpinned"
+,
+  "toastChatDeleted": "Deleted"
+,
+  "toastAccountSwitched": "Account switched"
+,
+  "toastSavedToGallery": "Saved to gallery"
+,
+  "toastSaveFailed": "Could not save"
+,
+  "toastMuteOn": "Muted"
+,
+  "toastMuteOff": "Unmuted"
 }

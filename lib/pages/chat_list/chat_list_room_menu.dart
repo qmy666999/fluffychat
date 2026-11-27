@@ -5,6 +5,7 @@
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/room_collapse.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
+import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
@@ -91,8 +92,13 @@ Future<void> showChatListRoomMenu(BuildContext context, Room room) async {
     case _RoomMenuAction.markUnread:
       final markUnread = !(room.markedUnread || room.notificationCount > 0);
       await room.markUnread(markUnread);
+      AppToast.show(
+        markUnread ? l10n.toastMarkedAsUnread : l10n.toastMarkedAsRead,
+      );
     case _RoomMenuAction.pin:
-      await room.setFavourite(!room.isFavourite);
+      final pin = !room.isFavourite;
+      await room.setFavourite(pin);
+      AppToast.show(pin ? l10n.toastChatPinned : l10n.toastChatUnpinned);
     case _RoomMenuAction.delete:
       final result = await showOkCancelAlertDialog(
         context: context,

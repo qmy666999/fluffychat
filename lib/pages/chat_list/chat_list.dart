@@ -799,14 +799,16 @@ class ChatListController extends State<ChatList>
         );
         return;
       case ChatContextAction.mute:
+        final mute = room.pushRuleState == PushRuleState.notify;
         await showFutureLoadingDialog(
           context: context,
           future: () => room.setPushRuleState(
-            room.pushRuleState == PushRuleState.notify
-                ? PushRuleState.mentionsOnly
-                : PushRuleState.notify,
+            mute ? PushRuleState.mentionsOnly : PushRuleState.notify,
           ),
         );
+        if (!mounted) return;
+        final l10n = L10n.of(context);
+        AppToast.show(mute ? l10n.toastMuteOn : l10n.toastMuteOff);
         return;
       case ChatContextAction.block:
         final inviteEvent = await room.requestUser(room.client.userID!);
