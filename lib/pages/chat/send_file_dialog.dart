@@ -14,6 +14,7 @@ import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat/image_edit_geometry.dart';
 import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
+import 'package:fluffychat/utils/diagnostics/action_logger.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_file_extension.dart';
 import 'package:fluffychat/utils/media/image_compressor.dart';
 import 'package:fluffychat/utils/other_party_can_receive.dart';
@@ -182,7 +183,44 @@ class SendFileDialogState extends State<SendFileDialog> {
         }
 
         final label = _labelTextController.text.trim();
-        await _uploadWithRetry(file, thumbnail: thumbnail, label: label);
+        // 诊断日志：只记大小/类型/耗时，不记文件名和内容。
+        final startedAt = DateTime.now();
+        ActionLogger.I.log(
+          'upload_start',
+          extra: {
+            'room_id': widget.room.id,
+            'size': file.bytes.length,
+            'mime': file.mimeType,
+            'index': i,
+            'count': total,
+          },
+        );
+        try {
+          await _uploadWithRetry(file, thumbnail: thumbnail, label: label);
+          ActionLogger.I.log(
+            'upload_done',
+            extra: {
+              'room_id': widget.room.id,
+              'size': file.bytes.length,
+              'duration_ms': DateTime.now()
+                  .difference(startedAt)
+                  .inMilliseconds,
+            },
+          );
+        } catch (e) {
+          ActionLogger.I.log(
+            'upload_fail',
+            extra: {
+              'room_id': widget.room.id,
+              'size': file.bytes.length,
+              'duration_ms': DateTime.now()
+                  .difference(startedAt)
+                  .inMilliseconds,
+              'error': '$e',
+            },
+          );
+          rethrow;
+        }
 
         if (mounted) setState(() => _sentCount = i + 1);
       }

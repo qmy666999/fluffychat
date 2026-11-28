@@ -6,6 +6,8 @@ import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/app_settings_launcher.dart';
+import 'package:fluffychat/utils/diagnostics/action_logger.dart';
+import 'package:fluffychat/utils/diagnostics/diag_exporter.dart';
 import 'package:fluffychat/utils/notifications/app_notifications.dart';
 import 'package:fluffychat/utils/notifications/notification_log.dart';
 import 'package:fluffychat/utils/updates/app_update_service.dart';
@@ -350,6 +352,27 @@ class SettingsGeneralPage extends StatefulWidget {
 }
 
 class _SettingsGeneralPageState extends State<SettingsGeneralPage> {
+  bool _exporting = false;
+
+  Future<void> _exportLogs() async {
+    final l10n = L10n.of(context);
+    setState(() => _exporting = true);
+    final content = await ActionLogger.I.exportText();
+    if (!mounted) return;
+    if (content.isEmpty) {
+      setState(() => _exporting = false);
+      AppToast.show(l10n.diagExportEmpty);
+      return;
+    }
+    final saved = await DiagExporter.exportToDownloads();
+    if (!mounted) return;
+    setState(() => _exporting = false);
+    AppToast.show(
+      saved ? l10n.exportLogsDone : l10n.exportLogsFailed,
+      isError: !saved,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = L10n.of(context);
@@ -394,6 +417,26 @@ class _SettingsGeneralPageState extends State<SettingsGeneralPage> {
           title: Text(l10n.storageSpace),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => context.go('/rooms/settings/storage'),
+        ),
+        const Divider(),
+        SwitchListTile.adaptive(
+          title: Text(l10n.diagUploadLogs),
+          subtitle: Text(l10n.diagUploadLogsHint),
+          value: AppSettings.diagUploadEnabled.value,
+          onChanged: (value) {
+            AppSettings.diagUploadEnabled.setItem(value);
+            setState(() {});
+          },
+        ),
+        ListTile(
+          title: Text(l10n.exportLogs),
+          trailing: _exporting
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.chevron_right),
+          onTap: _exporting ? null : _exportLogs,
         ),
       ],
     );

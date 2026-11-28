@@ -3353,5 +3353,11 @@
   "stickerDeletedCount": "Deleted {count} stickers",
   "@stickerDeletedCount": {"placeholders": {"count": {"type": "String"}}}
 ,
-  "stickerDragHint": "Drag the handle to reorder"
+  "stickerDragHint": "Drag the handle to reorder",
+  "diagUploadLogs": "Diagnostics upload",
+  "diagUploadLogsHint": "Only operation types are uploaded, never chat content",
+  "exportLogs": "Export logs",
+  "exportLogsDone": "Exported to the Downloads folder",
+  "exportLogsFailed": "Export failed",
+  "diagExportEmpty": "No logs yet"
 }

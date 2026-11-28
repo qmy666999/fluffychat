@@ -39,7 +39,10 @@ class ImageViewerView extends StatelessWidget {
           opacity: (1 - dragOffset / (MediaQuery.sizeOf(context).height * 0.5))
               .clamp(0.35, 1.0),
           child: GestureDetector(
-            onTap: () => Navigator.of(context).maybePop(),
+            onTap: () {
+              controller.markClosed('tap');
+              Navigator.of(context).maybePop();
+            },
             child: Scaffold(
               backgroundColor: Colors.black.withAlpha(128),
               extendBodyBehindAppBar: true,
@@ -48,7 +51,10 @@ class ImageViewerView extends StatelessWidget {
                 leading: IconButton(
                   style: iconButtonStyle,
                   icon: const Icon(Icons.close),
-                  onPressed: Navigator.of(context).pop,
+                  onPressed: () {
+                    controller.markClosed('close_button');
+                    Navigator.of(context).pop();
+                  },
                   color: Colors.white,
                   tooltip: L10n.of(context).close,
                 ),

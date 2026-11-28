@@ -746,6 +746,8 @@ abstract class AppRoutes {
     Widget child,
   ) => NoTransitionPage(
     key: state.pageKey,
+    // 路由名给诊断日志用（nav_push / nav_pop / back_gesture 里的栈）。
+    name: state.uri.toString(),
     restorationId: state.pageKey.value,
     child: child,
   );
@@ -763,6 +765,8 @@ abstract class AppRoutes {
     if (style == MotionStyle.none) {
       return CustomTransitionPage(
         key: state.pageKey,
+        // 路由名给诊断日志用（nav_push / nav_pop / back_gesture 里的栈）。
+        name: state.uri.toString(),
         restorationId: state.pageKey.value,
         transitionDuration: Duration.zero,
         reverseTransitionDuration: Duration.zero,
@@ -785,6 +789,8 @@ abstract class AppRoutes {
             style == MotionStyle.sharedAxisY)) {
       return CustomTransitionPage(
         key: state.pageKey,
+        // 路由名给诊断日志用（nav_push / nav_pop / back_gesture 里的栈）。
+        name: state.uri.toString(),
         restorationId: state.pageKey.value,
         transitionDuration: duration,
         reverseTransitionDuration: duration,
@@ -817,6 +823,8 @@ abstract class AppRoutes {
     }
     return CustomTransitionPage(
       key: state.pageKey,
+      // 路由名给诊断日志用（nav_push / nav_pop / back_gesture 里的栈）。
+      name: state.uri.toString(),
       restorationId: state.pageKey.value,
       transitionDuration: duration,
       reverseTransitionDuration: duration,

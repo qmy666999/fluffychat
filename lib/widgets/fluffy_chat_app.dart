@@ -12,6 +12,8 @@ import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat/active_call_banner.dart';
+import 'package:fluffychat/utils/diagnostics/action_logger.dart';
+import 'package:fluffychat/utils/diagnostics/diag_route_observer.dart';
 import 'package:fluffychat/widgets/app_lock.dart';
 import 'package:fluffychat/widgets/layouts/call_overlay.dart';
 import 'package:fluffychat/widgets/theme_builder.dart';
@@ -49,6 +51,8 @@ class FluffyChatApp extends StatelessWidget {
   static final GoRouter router = GoRouter(
     routes: AppRoutes.routes,
     debugLogDiagnostics: true,
+    // 记录路由栈：出「返回到底关掉了谁」这类问题时，日志里能直接看到栈。
+    observers: [DiagRouteObserver()],
     redirect: (context, state) {
       // Workaround for content sharings passed to go router:
       if ({
@@ -114,21 +118,29 @@ class FluffyChatApp extends StatelessWidget {
         ],
         supportedLocales: L10n.supportedLocales,
         routerConfig: router,
-        builder: (context, child) => AppLockWidget(
-          pincode: appLockSettings.pincode,
-          useBiometrics: appLockSettings.useBiometrics,
-          isLoggedIn: clients.any((client) => client.isLogged()),
-          // 全局通话横幅：挂在 Navigator 外面，所以切到通讯录、发现、我
-          // 这些页面时横幅也一直在。放在 AppLockWidget 里面，锁屏时它会被
-          // 锁屏界面盖住，不会泄露通话状态。
-          child: GlobalCallBannerHost(
-            // Need a navigator above the Matrix widget for
-            // displaying dialogs
-            child: Matrix(
-              clients: clients,
-              store: store,
-              child: CallOverlay(
-                child: testWidget ?? child ?? const SizedBox.shrink(),
+        builder: (context, child) => BackButtonListener(
+          // 系统返回手势：先把当时的完整路由栈记下来，再走正常返回逻辑。
+          // 这条日志是「返回把不该关的页面关掉了」这类 bug 的唯一证据。
+          onBackButtonPressed: () {
+            ActionLogger.I.log('back_gesture', stack: DiagRouteObserver.stack);
+            return FluffyChatApp.router.routerDelegate.popRoute();
+          },
+          child: AppLockWidget(
+            pincode: appLockSettings.pincode,
+            useBiometrics: appLockSettings.useBiometrics,
+            isLoggedIn: clients.any((client) => client.isLogged()),
+            // 全局通话横幅：挂在 Navigator 外面，所以切到通讯录、发现、我
+            // 这些页面时横幅也一直在。放在 AppLockWidget 里面，锁屏时它会被
+            // 锁屏界面盖住，不会泄露通话状态。
+            child: GlobalCallBannerHost(
+              // Need a navigator above the Matrix widget for
+              // displaying dialogs
+              child: Matrix(
+                clients: clients,
+                store: store,
+                child: CallOverlay(
+                  child: testWidget ?? child ?? const SizedBox.shrink(),
+                ),
               ),
             ),
           ),

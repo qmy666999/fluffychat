@@ -9,6 +9,8 @@ import 'dart:convert';
 import 'package:collection/collection.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/client_manager.dart';
+import 'package:fluffychat/utils/diagnostics/action_logger.dart';
+import 'package:fluffychat/utils/diagnostics/diag_service.dart';
 import 'package:fluffychat/utils/init_with_restore.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_file_extension.dart';
 import 'package:fluffychat/utils/notification_background_handler.dart';
@@ -190,6 +192,10 @@ class MatrixState extends State<Matrix> {
   final onLogoutSub = <String, StreamSubscription<LoginState>>{};
   final onUiaRequest = <String, StreamSubscription<UiaRequest>>{};
   final onTimelineEventSub = <String, StreamSubscription>{};
+  final onSyncStatusSub = <String, StreamSubscription>{};
+
+  /// sync 状态日志（`sync_state`）也做节流，避免每分钟刷一堆连接事件。
+  DateTime? _lastSyncStateLogAt;
 
   /// 全 App 共用一个通知插件实例：建渠道、弹本地通知、处理点击都走它。
   final FlutterLocalNotificationsPlugin _localNotifications =
@@ -358,6 +364,7 @@ class MatrixState extends State<Matrix> {
 
           _cancelSubs(c.clientName);
           unawaited(MatrixVoip.of(c)?.dispose());
+          DiagService.I.stop();
           // 退登的可能是「当前账号以外的」账号：把 clients 里的一项删掉会让
           // 后面的下标整体前移，先修正 _activeClient，否则会悄悄切到别的账号。
           final removedIndex = widget.clients.indexOf(c);
@@ -429,6 +436,26 @@ class MatrixState extends State<Matrix> {
     );
     // 1 对 1 通话：每个客户端一个实例，负责信令、铃声和通话状态。
     MatrixVoip.ensure(c);
+    // 操作日志上报：把本地日志分批发到自己的诊断房间。
+    DiagService.I.start(c);
+    onSyncStatusSub[name] ??= c.onSyncStatus.stream.listen((update) {
+      if (update.status == SyncStatus.finished) {
+        final now = DateTime.now();
+        if (_lastSyncStateLogAt != null &&
+            now.difference(_lastSyncStateLogAt!) < const Duration(minutes: 1)) {
+          return;
+        }
+        _lastSyncStateLogAt = now;
+        ActionLogger.I.log('sync_state', extra: {'state': 'connected'});
+        return;
+      }
+      if (update.error != null) {
+        ActionLogger.I.log(
+          'sync_state',
+          extra: {'state': 'error', 'error': '${update.error}'},
+        );
+      }
+    });
   }
 
   void _cancelSubs(String name) {
@@ -444,6 +471,8 @@ class MatrixState extends State<Matrix> {
     onReceipts.remove(name);
     onTimelineEventSub[name]?.cancel();
     onTimelineEventSub.remove(name);
+    onSyncStatusSub[name]?.cancel();
+    onSyncStatusSub.remove(name);
   }
 
   Future<void> initMatrix() async {
@@ -689,6 +718,16 @@ class MatrixState extends State<Matrix> {
     }
     _notifiedEventIds[key] = event.eventId;
     NotificationLog.add('调用 show() room=${room.id} unread=$unread');
+    ActionLogger.I.log(
+      'notification_show',
+      extra: {
+        'room_id': room.id,
+        'foreground':
+            _lifecycleState == AppLifecycleState.resumed ||
+            _lifecycleState == null,
+        'unread': unread,
+      },
+    );
     try {
       await pushHelper(
         PushNotification(
@@ -740,6 +779,9 @@ class MatrixState extends State<Matrix> {
       sub.cancel();
     }
     for (final sub in onTimelineEventSub.values) {
+      sub.cancel();
+    }
+    for (final sub in onSyncStatusSub.values) {
       sub.cancel();
     }
     onRoomKeyRequestSub.clear();

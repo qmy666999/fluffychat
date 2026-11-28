@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:fluffychat/pages/image_viewer/image_viewer.dart';
+import 'package:fluffychat/utils/diagnostics/action_logger.dart';
+import 'package:fluffychat/utils/diagnostics/diag_route_observer.dart';
 import 'package:fluffychat/widgets/mxc_image_viewer.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -22,10 +24,17 @@ Future<void> showImageViewer(
   Timeline? timeline,
   BuildContext? outerContext,
 }) {
+  ActionLogger.I.log(
+    'open_image_viewer',
+    extra: {'event_id': event.eventId, 'room_id': event.roomId},
+    route: '/image_viewer/${event.eventId}',
+    stack: DiagRouteObserver.stack,
+  );
   final navigator = Navigator.of(context, rootNavigator: true);
   final reduceMotion = MediaQuery.disableAnimationsOf(context);
   return navigator.push<void>(
     PageRouteBuilder<void>(
+      settings: RouteSettings(name: '/image_viewer/${event.eventId}'),
       opaque: true,
       barrierColor: Colors.black,
       fullscreenDialog: true,

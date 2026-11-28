@@ -40,6 +40,9 @@ enum AppSettings<T> {
   // 微信语义：撤回的消息在聊天里彻底消失（不留「该消息已被删除」占位）。
   // 想要看到撤回提示的，可以在 设置 → 聊天 → 显示撤回提示 里打开。
   hideRedactedEvents<bool>('chat.fluffy.hideRedactedEvents', true),
+
+  /// 操作日志上报到自己的诊断房间（默认开）。关掉后只在本地写。
+  diagUploadEnabled<bool>('chat.fluffy.diag_upload', true),
   hideUnknownEvents<bool>('chat.fluffy.hideUnknownEvents', true),
   autoplayImages<bool>('chat.fluffy.autoplay_images', true),
   sendTypingNotifications<bool>('chat.fluffy.send_typing_notifications', true),

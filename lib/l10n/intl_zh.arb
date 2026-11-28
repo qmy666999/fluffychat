@@ -3353,5 +3353,11 @@
   "stickerDeletedCount": "已删除 {count} 个表情",
   "@stickerDeletedCount": {"placeholders": {"count": {"type": "String"}}}
 ,
-  "stickerDragHint": "长按右侧手柄拖动排序"
+  "stickerDragHint": "长按右侧手柄拖动排序",
+  "diagUploadLogs": "诊断日志上报",
+  "diagUploadLogsHint": "只上传操作类型，不上传聊天内容",
+  "exportLogs": "导出日志",
+  "exportLogsDone": "已导出到 Download 目录",
+  "exportLogsFailed": "导出失败",
+  "diagExportEmpty": "还没有日志"
 }

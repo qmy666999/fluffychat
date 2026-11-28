@@ -20,6 +20,7 @@ import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
 import 'package:fluffychat/pages/chat/utils/web_file_to_x_file.dart';
 import 'package:fluffychat/pages/chat_details/chat_details.dart';
 import 'package:fluffychat/utils/adaptive_bottom_sheet.dart';
+import 'package:fluffychat/utils/diagnostics/action_logger.dart';
 import 'package:fluffychat/utils/error_reporter.dart';
 import 'package:fluffychat/utils/file_selector.dart';
 import 'package:fluffychat/utils/matrix_live_kit_calls/matrix_live_kit_call.dart';
@@ -772,6 +773,16 @@ class ChatController extends State<ChatPageWithRoom>
       room.setTyping(false);
     }
 
+    // 诊断日志：只记消息类型，不记正文。
+    ActionLogger.I.log(
+      'send_message',
+      extra: {
+        'room_id': roomId,
+        'msgtype': 'm.text',
+        'edit': editEvent != null,
+        'reply': replyEvent != null,
+      },
+    );
     // ignore: unawaited_futures
     room.sendTextEvent(
       sendController.text,

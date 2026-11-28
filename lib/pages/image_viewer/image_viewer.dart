@@ -5,6 +5,8 @@
 
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/pages/image_viewer/image_viewer_view.dart';
+import 'package:fluffychat/utils/diagnostics/action_logger.dart';
+import 'package:fluffychat/utils/diagnostics/diag_route_observer.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/show_scaffold_dialog.dart';
 import 'package:fluffychat/widgets/share_scaffold_dialog.dart';
@@ -60,6 +62,11 @@ class ImageViewerController extends State<ImageViewer> {
 
   late final List<Event> allEvents;
 
+  /// 打开时间与关闭方式，只用于 `close_image_viewer` 这条日志。
+  late final DateTime _openedAt = DateTime.now();
+  String _closeMethod = 'back';
+  bool _closeLogged = false;
+
   /// 每张图一个变换控制器，用来判断当前是否被放大（放大时不要响应下拉关闭）。
   final Map<int, TransformationController> _transformationControllers = {};
 
@@ -108,6 +115,7 @@ class ImageViewerController extends State<ImageViewer> {
         _dragOffset > threshold ||
         (delta.dy > threshold && delta.dy > delta.dx.abs() * 1.5);
     if (shouldClose) {
+      markClosed('drag');
       Navigator.of(context).maybePop();
       return;
     }
@@ -177,13 +185,35 @@ class ImageViewerController extends State<ImageViewer> {
     if (PlatformInfos.usesTouchscreen == false) {
       if (endDetails.velocity.pixelsPerSecond.dy >
           MediaQuery.sizeOf(context).height * maxScaleFactor) {
+        markClosed('fling');
         Navigator.of(context).maybePop();
       }
     }
   }
 
+  /// 记录关闭方式（返回手势 / 点关闭 / 下拉），dispose 时一次性写日志。
+  void markClosed(String method) {
+    _closeMethod = method;
+  }
+
+  void _logClosed() {
+    if (_closeLogged) return;
+    _closeLogged = true;
+    ActionLogger.I.log(
+      'close_image_viewer',
+      extra: {
+        'event_id': widget.event.eventId,
+        'room_id': widget.event.roomId,
+        'method': _closeMethod,
+        'duration_ms': DateTime.now().difference(_openedAt).inMilliseconds,
+      },
+      stack: DiagRouteObserver.stack,
+    );
+  }
+
   @override
   void dispose() {
+    _logClosed();
     focusNode.dispose();
     pageController.dispose();
     for (final controller in _transformationControllers.values) {

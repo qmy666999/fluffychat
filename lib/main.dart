@@ -27,6 +27,9 @@ import 'config/motion_settings.dart';
 import 'config/server_endpoints.dart';
 import 'config/setting_keys.dart';
 import 'utils/background_push.dart';
+import 'utils/diagnostics/action_logger.dart';
+import 'utils/diagnostics/diag_bootstrap.dart';
+import 'utils/diagnostics/diag_route_observer.dart';
 import 'utils/server_probe.dart';
 import 'utils/wechat/wechat_prefs.dart';
 import 'widgets/fluffy_chat_app.dart';
@@ -42,10 +45,28 @@ void main(List<String> args) => runZonedGuarded(() async {
   installPrivateCertOverride();
 
   // Forward Flutter errors to global error reporter
-  FlutterError.onError = (details) => Zone.current.handleUncaughtError(
-    details.exception,
-    details.stack ?? StackTrace.current,
-  );
+  FlutterError.onError = (details) {
+    ActionLogger.I.log(
+      'error',
+      extra: {
+        'msg': details.exceptionAsString(),
+        'stack': details.stack?.toString() ?? '',
+      },
+      stack: DiagRouteObserver.stack,
+    );
+    Zone.current.handleUncaughtError(
+      details.exception,
+      details.stack ?? StackTrace.current,
+    );
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    ActionLogger.I.log(
+      'error',
+      extra: {'msg': '$error', 'stack': '$stack'},
+      stack: DiagRouteObserver.stack,
+    );
+    return true;
+  };
 
   isIntegrationTest = args.singleOrNull == 'integration_test';
   if (PlatformInfos.isAndroid) {
@@ -76,6 +97,8 @@ void main(List<String> args) => runZonedGuarded(() async {
   Logs().i('[ServerEndpoints] using ${ServerEndpoints.current}');
 
   final store = await AppSettings.init();
+  // 操作日志：要在任何界面之前初始化，才能把启动和早期错误记下来。
+  await initDiagnostics(store);
   // 动效设置要在任何路由构造之前读进内存（路由里取的是静态字段，不能 await）。
   MotionSettings.load(store);
   WechatPrefs.init(store);
@@ -155,6 +178,8 @@ Future<void> startGui(List<Client> clients, SharedPreferences store) async {
   final firstClient = clients.firstOrNull;
   await firstClient?.roomsLoading;
   await firstClient?.accountDataLoading;
+
+  await logAppStart();
 
   runApp(
     FluffyChatApp(

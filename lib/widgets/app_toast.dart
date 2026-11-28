@@ -4,6 +4,7 @@
 
 import 'dart:async';
 
+import 'package:fluffychat/utils/diagnostics/action_logger.dart';
 import 'package:fluffychat/widgets/fluffy_chat_app.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart' show Logs;
@@ -62,6 +63,8 @@ class AppToast {
     AppToastAction? action,
   }) {
     if (text.trim().isEmpty) return;
+    // 诊断日志：提示本身就是「用户到底看到没看到」的证据。
+    ActionLogger.I.log('toast', extra: {'text': text, 'error': isError});
     _show(
       child: _ToastText(text: text, action: action),
       duration: isError ? errorDuration : defaultDuration,
