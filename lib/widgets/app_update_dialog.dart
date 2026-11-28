@@ -76,10 +76,19 @@ class AppUpdateDialog extends StatelessWidget {
   }
 
   String? _errorText(L10n l10n, UpdateDownloadState state) {
+    // 安装失败时状态会退回「已下载」（文件还在，可以重试），所以这里不能只看
+    // failed：只要带 error 就要把原因显示出来，用户才知道该去开哪个权限。
+    if (state.error == null) return null;
+    if (state.error == AppUpdateError.install) {
+      return switch (state.errorDetail) {
+        'no_permission' => l10n.updateInstallNoPermission,
+        'missing' => l10n.updateInstallFileMissing,
+        _ => l10n.updateInstallFailed,
+      };
+    }
     if (state.status != UpdateDownloadStatus.failed) return null;
     return switch (state.error) {
       AppUpdateError.checksum => l10n.updateChecksumFailed,
-      AppUpdateError.install => l10n.updateInstallFailed,
       AppUpdateError.rejected => l10n.updateServerRejected,
       _ => l10n.updateFailed(state.errorDetail ?? ''),
     };

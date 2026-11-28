@@ -3417,5 +3417,7 @@
   },
   "viewDiagnostics": "View diagnostics",
   "viewDiagnosticsHint": "Only operation types, never chat content",
-  "viewDiagnosticsFailed": "Cannot open diagnostics"
+  "viewDiagnosticsFailed": "Cannot open diagnostics",
+  "updateInstallNoPermission": "The installer did not open. Allow \"Install unknown apps\" in Settings and try again",
+  "updateInstallFileMissing": "The installer file is gone, please download again"
 }

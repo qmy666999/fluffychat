@@ -1,11 +1,14 @@
 // SPDX-FileCopyrightText: 2026 FluffyChatX
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:fluffychat/config/server_endpoints.dart';
+import 'package:fluffychat/utils/app_settings_launcher.dart';
+import 'package:fluffychat/utils/diagnostics/action_logger.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:matrix/matrix.dart';
@@ -375,39 +378,99 @@ class AppUpdateService {
   }
 
   /// 调起系统安装器。**不删文件**，等下次启动清理。
+  ///
+  /// 调起外部 App 的操作必须假设会失败：
+  /// - 安装包被系统清掉了（临时目录会被回收）
+  /// - 用户没开「安装未知应用」，`startActivity` 可能什么都不发生也不抛异常
+  /// - FileProvider / intent 被机型限制
+  ///
+  /// 所以每条失败路径都要把状态从 `installing` 里放出来，否则按钮永久禁用，
+  /// 用户只能杀 App。
   static Future<void> installDownloaded() async {
-    final path = downloadState.value.filePath;
+    final state = downloadState.value;
+    final path = state.filePath;
     if (path == null) {
-      downloadState.value = const UpdateDownloadState(
-        status: UpdateDownloadStatus.failed,
-        error: AppUpdateError.install,
-        errorDetail: 'no file',
-      );
+      _failInstall('missing', state);
       return;
     }
     final file = File(path);
     if (!await file.exists()) {
-      downloadState.value = const UpdateDownloadState(
-        status: UpdateDownloadStatus.failed,
-        error: AppUpdateError.install,
-        errorDetail: 'missing file',
-      );
+      Logs().w('[Update] 安装包不在了: $path');
+      _failInstall('missing', state);
       return;
     }
 
-    downloadState.value = downloadState.value.copyWith(
-      status: UpdateDownloadStatus.installing,
-    );
-    final result = await OpenFilex.open(file.path);
-    if (result.type != ResultType.done) {
-      Logs().w('[Update] 无法调起安装器: ${result.type} ${result.message}');
-      downloadState.value = downloadState.value.copyWith(
-        status: UpdateDownloadStatus.failed,
+    if (!await canInstallPackages()) {
+      Logs().w('[Update] 没有「安装未知应用」权限，跳设置页');
+      ActionLogger.I.log('update_install', extra: {'result': 'no_permission'});
+      // 返回「已下载」而不是失败：文件还在，用户授权完可以直接再点安装。
+      downloadState.value = state.copyWith(
+        status: UpdateDownloadStatus.downloaded,
         error: AppUpdateError.install,
-        errorDetail: result.message,
+        errorDetail: 'no_permission',
+      );
+      await openInstallPermissionSettings();
+      return;
+    }
+
+    downloadState.value = state.copyWith(
+      status: UpdateDownloadStatus.installing,
+      clearError: true,
+    );
+
+    try {
+      final result = await OpenFilex.open(file.path);
+      if (result.type != ResultType.done) {
+        Logs().w('[Update] 无法调起安装器: ${result.type} ${result.message}');
+        ActionLogger.I.log(
+          'update_install',
+          extra: {'result': 'open_failed', 'detail': result.message},
+        );
+        downloadState.value = downloadState.value.copyWith(
+          status: UpdateDownloadStatus.downloaded,
+          error: AppUpdateError.install,
+          errorDetail: 'open_failed',
+        );
+        return;
+      }
+      ActionLogger.I.log('update_install', extra: {'result': 'opened'});
+      // 安装器是否真的弹出来，App 这边拿不到回调。3 秒后如果还停在
+      // installing，就退回「已下载」，这样用户取消安装回来后还能再点一次。
+      _installFallbackTimer?.cancel();
+      _installFallbackTimer = Timer(const Duration(seconds: 3), () {
+        final current = downloadState.value;
+        if (current.status != UpdateDownloadStatus.installing) return;
+        downloadState.value = current.copyWith(
+          status: UpdateDownloadStatus.downloaded,
+          clearError: true,
+        );
+      });
+    } catch (e, s) {
+      Logs().w('[Update] 调起安装器抛异常', e, s);
+      ActionLogger.I.log(
+        'update_install',
+        extra: {'result': 'exception', 'detail': '$e'},
+      );
+      downloadState.value = downloadState.value.copyWith(
+        status: UpdateDownloadStatus.downloaded,
+        error: AppUpdateError.install,
+        errorDetail: 'exception: $e',
       );
     }
   }
+
+  /// 安装包没了（被临时目录回收 / 手动删了）：只能重新下载。
+  static void _failInstall(String detail, UpdateDownloadState state) {
+    ActionLogger.I.log('update_install', extra: {'result': detail});
+    downloadState.value = state.copyWith(
+      status: UpdateDownloadStatus.failed,
+      error: AppUpdateError.install,
+      errorDetail: detail,
+    );
+  }
+
+  /// 调起安装器之后的兜底定时器：3 秒还停在 installing 就退回「已下载」。
+  static Timer? _installFallbackTimer;
 
   /// 关闭弹窗后把状态复位（已经下载好的不要复位，下次还能点安装）。
   static void resetIdleIfFailed() {

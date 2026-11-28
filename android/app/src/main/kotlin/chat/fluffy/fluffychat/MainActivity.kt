@@ -148,6 +148,34 @@ class MainActivity : FlutterFragmentActivity() {
                                 result.success(false)
                             }
                         }
+                        "canInstallPackages" -> {
+                            // Android 8+ 每个 App 单独授权「安装未知应用」，
+                            // 没开的时候调起安装器可能什么都不发生（不抛异常），
+                            // 所以安装前必须先问 PackageManager。
+                            val allowed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                appContext.packageManager.canRequestPackageInstalls()
+                            } else {
+                                true
+                            }
+                            result.success(allowed)
+                        }
+                        "openInstallPermissionSettings" -> {
+                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                                result.success(false)
+                                return@setMethodCallHandler
+                            }
+                            val intent = Intent(
+                                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.fromParts("package", appContext.packageName, null),
+                            )
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            try {
+                                appContext.startActivity(intent)
+                                result.success(true)
+                            } catch (e: Exception) {
+                                result.success(false)
+                            }
+                        }
                         else -> result.notImplemented()
                     }
                 }

@@ -25,3 +25,33 @@ Future<bool> openAppNotificationSettings() async {
     return false;
   }
 }
+
+/// 当前是否允许「安装未知应用」。
+///
+/// Android 8+ 每个 App 需要单独授权，没开的时候调起安装器**可能什么都不发生**
+/// （不抛异常），所以安装前必须先问一下 PackageManager。
+/// 非 Android 平台直接返回 true（不需要这个权限）。
+Future<bool> canInstallPackages() async {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return true;
+  try {
+    final result = await _channel.invokeMethod<bool>('canInstallPackages');
+    return result ?? false;
+  } catch (e) {
+    debugPrint('[AppSettings] canInstallPackages failed: $e');
+    return false;
+  }
+}
+
+/// 跳到「安装未知应用」授权页（`ACTION_MANAGE_UNKNOWN_APP_SOURCES`）。
+Future<bool> openInstallPermissionSettings() async {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return false;
+  try {
+    final result = await _channel.invokeMethod<bool>(
+      'openInstallPermissionSettings',
+    );
+    return result ?? false;
+  } catch (e) {
+    debugPrint('[AppSettings] openInstallPermissionSettings failed: $e');
+    return false;
+  }
+}
