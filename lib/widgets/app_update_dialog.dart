@@ -50,137 +50,180 @@ Future<void> showAppUpdateDialog(BuildContext context, AppUpdateInfo info) =>
     showDialog<void>(
       context: context,
       barrierDismissible: !info.force,
-      builder: (context) => _AppUpdateDialog(info: info),
+      builder: (context) => AppUpdateDialog(info: info),
     );
 
-class _AppUpdateDialog extends StatefulWidget {
-  const _AppUpdateDialog({required this.info});
+/// 更新弹窗：状态机驱动按钮与进度区。
+///
+/// 关键点：下载完成之后按钮必须变成「安装」，不能让用户以为没下完。
+/// 状态存在 [AppUpdateService.downloadState] 里，切走 App 再回来还在。
+class AppUpdateDialog extends StatelessWidget {
+  const AppUpdateDialog({super.key, required this.info});
 
   final AppUpdateInfo info;
-
-  @override
-  State<_AppUpdateDialog> createState() => _AppUpdateDialogState();
-}
-
-class _AppUpdateDialogState extends State<_AppUpdateDialog> {
-  double? _progress;
-  AppUpdateError? _error;
-  String? _errorDetail;
-  bool _installing = false;
-
-  Future<void> _startUpdate() async {
-    setState(() {
-      _error = null;
-      _errorDetail = null;
-      _progress = 0;
-      _installing = true;
-    });
-    try {
-      await AppUpdateService.downloadAndInstall(
-        widget.info,
-        onProgress: (value) {
-          if (!mounted) return;
-          setState(() => _progress = value);
-        },
-      );
-    } on AppUpdateException catch (e) {
-      Logs().w('[Update] 更新失败: ${e.error} ${e.detail}');
-      if (!mounted) return;
-      setState(() {
-        _installing = false;
-        _progress = null;
-        _error = e.error;
-        _errorDetail = e.detail;
-      });
-    }
-  }
-
-  String _errorText(L10n l10n) => switch (_error) {
-    AppUpdateError.checksum => l10n.updateChecksumFailed,
-    AppUpdateError.install => l10n.updateInstallFailed,
-    AppUpdateError.rejected => l10n.updateServerRejected,
-    _ => l10n.updateFailed(_errorDetail ?? ''),
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = L10n.of(context);
-    final theme = Theme.of(context);
-    final info = widget.info;
-    final progress = _progress;
-    return PopScope(
-      canPop: !info.force,
-      child: AlertDialog(
-        title: Text(l10n.updateAvailable(info.versionName)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (info.changelog.isNotEmpty) ...[
-                Text(info.changelog),
-                const SizedBox(height: 16),
-              ],
-              if (info.force)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    l10n.updateForceHint,
-                    style: TextStyle(color: theme.colorScheme.error),
-                  ),
-                ),
-              _InfoRow(
-                label: l10n.updateNewVersion,
-                value: '${info.versionName} (${info.versionCode})',
-              ),
-              _InfoRow(label: l10n.updateSize, value: _sizeLabel(info.size)),
-              FutureBuilder<String>(
-                future: AppUpdateService.currentVersionLabel(),
-                builder: (context, snapshot) => _InfoRow(
-                  label: l10n.updateCurrentVersion,
-                  value: snapshot.data ?? '—',
-                ),
-              ),
-              if (progress != null) ...[
-                const SizedBox(height: 16),
-                LinearProgressIndicator(value: progress),
-                const SizedBox(height: 8),
-                Text(
-                  _installing && progress >= 1
-                      ? l10n.updateVerifying
-                      : l10n.updateDownloading('${(progress * 100).round()}'),
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _errorText(l10n),
-                  style: TextStyle(color: theme.colorScheme.error),
-                ),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          if (!info.force)
-            TextButton(
-              onPressed: _installing ? null : () => Navigator.of(context).pop(),
-              child: Text(l10n.updateLater),
-            ),
-          FilledButton(
-            onPressed: _installing ? null : _startUpdate,
-            child: Text(l10n.updateNow),
-          ),
-        ],
-      ),
-    );
-  }
 
   String _sizeLabel(int bytes) {
     if (bytes <= 0) return '—';
     final mb = bytes / (1024 * 1024);
     return '${mb.toStringAsFixed(1)} MB';
+  }
+
+  String _speedLabel(double bytesPerSecond) {
+    if (bytesPerSecond <= 0) return '';
+    final kb = bytesPerSecond / 1024;
+    if (kb < 1024) return '${kb.toStringAsFixed(0)} KB/s';
+    return '${(kb / 1024).toStringAsFixed(1)} MB/s';
+  }
+
+  String? _errorText(L10n l10n, UpdateDownloadState state) {
+    if (state.status != UpdateDownloadStatus.failed) return null;
+    return switch (state.error) {
+      AppUpdateError.checksum => l10n.updateChecksumFailed,
+      AppUpdateError.install => l10n.updateInstallFailed,
+      AppUpdateError.rejected => l10n.updateServerRejected,
+      _ => l10n.updateFailed(state.errorDetail ?? ''),
+    };
+  }
+
+  Future<void> _onPrimaryPressed(UpdateDownloadState state) async {
+    switch (state.status) {
+      case UpdateDownloadStatus.idle:
+      case UpdateDownloadStatus.failed:
+        await AppUpdateService.startDownload(info);
+      case UpdateDownloadStatus.downloading:
+        await AppUpdateService.cancelDownload();
+      case UpdateDownloadStatus.downloaded:
+        await AppUpdateService.installDownloaded();
+      case UpdateDownloadStatus.installing:
+        break;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = L10n.of(context);
+    final theme = Theme.of(context);
+
+    return PopScope(
+      canPop: !info.force,
+      child: ValueListenableBuilder<UpdateDownloadState>(
+        valueListenable: AppUpdateService.downloadState,
+        builder: (context, state, _) {
+          final errorText = _errorText(l10n, state);
+
+          return AlertDialog(
+            title: Text(l10n.updateAvailable(info.versionName)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (info.changelog.isNotEmpty) ...[
+                    Text(info.changelog),
+                    const SizedBox(height: 16),
+                  ],
+                  if (info.force)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        l10n.updateForceHint,
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                    ),
+                  _InfoRow(
+                    label: l10n.updateNewVersion,
+                    value: '${info.versionName} (${info.versionCode})',
+                  ),
+                  _InfoRow(
+                    label: l10n.updateSize,
+                    value: _sizeLabel(
+                      state.totalBytes > 0 ? state.totalBytes : info.size,
+                    ),
+                  ),
+                  FutureBuilder<String>(
+                    future: AppUpdateService.currentVersionLabel(),
+                    builder: (context, snapshot) => _InfoRow(
+                      label: l10n.updateCurrentVersion,
+                      value: snapshot.data ?? '—',
+                    ),
+                  ),
+                  if (state.status == UpdateDownloadStatus.downloading) ...[
+                    const SizedBox(height: 16),
+                    LinearProgressIndicator(
+                      value: state.progress > 0 ? state.progress : null,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      [
+                        l10n.updateDownloading(
+                          '${(state.progress * 100).round()}',
+                        ),
+                        if (_speedLabel(state.bytesPerSecond).isNotEmpty)
+                          _speedLabel(state.bytesPerSecond),
+                      ].join(' · '),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                  if (state.status == UpdateDownloadStatus.downloaded) ...[
+                    const SizedBox(height: 16),
+                    const LinearProgressIndicator(value: 1),
+                    const SizedBox(height: 8),
+                    Text(
+                      l10n.updateDownloadDone(
+                        _sizeLabel(
+                          state.receivedBytes > 0
+                              ? state.receivedBytes
+                              : info.size,
+                        ),
+                      ),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                  if (state.status == UpdateDownloadStatus.installing) ...[
+                    const SizedBox(height: 16),
+                    const LinearProgressIndicator(),
+                    const SizedBox(height: 8),
+                    Text(
+                      l10n.updateInstalling,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                  if (errorText != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      errorText,
+                      style: TextStyle(color: theme.colorScheme.error),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              if (!info.force)
+                TextButton(
+                  onPressed: () {
+                    AppUpdateService.resetIdleIfFailed();
+                    Navigator.of(context).pop();
+                  },
+                  child: Text(l10n.updateLater),
+                ),
+              FilledButton(
+                onPressed: state.status == UpdateDownloadStatus.installing
+                    ? null
+                    : () => _onPrimaryPressed(state),
+                child: Text(switch (state.status) {
+                  UpdateDownloadStatus.idle => l10n.updateNow,
+                  UpdateDownloadStatus.downloading => l10n.updateCancelDownload,
+                  UpdateDownloadStatus.downloaded => l10n.updateInstallNow,
+                  UpdateDownloadStatus.installing => l10n.updateInstalling,
+                  UpdateDownloadStatus.failed => l10n.updateRetry,
+                }),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -194,19 +237,15 @@ class _InfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 84,
-            child: Text(
-              label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
+            width: 96,
+            child: Text(label, style: theme.textTheme.bodySmall),
           ),
-          Expanded(child: Text(value, style: theme.textTheme.bodySmall)),
+          Expanded(child: Text(value)),
         ],
       ),
     );

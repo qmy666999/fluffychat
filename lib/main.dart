@@ -14,6 +14,7 @@ import 'package:fluffychat/utils/error_reporter.dart';
 import 'package:fluffychat/utils/notification_background_handler.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/start_push_foreground_service.dart';
+import 'package:fluffychat/utils/updates/app_update_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_vodozemac/flutter_vodozemac.dart' as vod;
@@ -280,6 +281,11 @@ Future<void> startGui(List<Client> clients, SharedPreferences store) async {
     ),
   );
   _bootSettled = true;
+  // 上次安装留下的 APK 在这里删：安装器在另一个进程里干活，
+  // 装完立刻删会让「安装失败再点一次」没得点，所以放到下一次启动。
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(AppUpdateService.cleanupUpdateDir());
+  });
   WidgetsBinding.instance.addPostFrameCallback((_) {
     unawaited(
       logAppStart().catchError((Object error, StackTrace stack) {

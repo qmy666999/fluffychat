@@ -3369,5 +3369,50 @@
   "transcriptionService": "语音转文字服务",
   "transcriptionServiceHint": "留空则关闭这个功能（长按语音不会有「转文字」）",
   "transcriptionServiceOff": "未配置（已关闭）",
-  "transcriptionServiceInvalid": "地址要以 http:// 或 https:// 开头"
+  "transcriptionServiceInvalid": "地址要以 http:// 或 https:// 开头",
+  "updateCancelDownload": "取消下载",
+  "updateInstallNow": "安装",
+  "updateRetry": "重试",
+  "updateInstalling": "正在安装…",
+  "updateDownloadDone": "{size} 已下载",
+  "@updateDownloadDone": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "clearCache": "清理缓存",
+  "cacheApk": "安装包",
+  "cacheImages": "图片缓存",
+  "cacheTemp": "临时文件",
+  "cacheTotal": "共 {size}",
+  "@cacheTotal": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "cacheKeepNote": "聊天记录和登录信息不会被清理。",
+  "clearCacheNow": "一键清理",
+  "clearingCache": "正在清理…",
+  "clearedCacheSize": "已清理 {size}",
+  "@clearedCacheSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "asrConnected": "已连接",
+  "asrUnreachable": "服务连不上，请检查地址",
+  "transcribeFailedWith": "转文字失败（{reason}），点一下重试",
+  "@transcribeFailedWith": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  }
 }

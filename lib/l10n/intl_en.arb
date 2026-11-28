@@ -3369,5 +3369,50 @@
   "transcriptionService": "Speech-to-text service",
   "transcriptionServiceHint": "Leave empty to disable transcription",
   "transcriptionServiceOff": "Not configured (off)",
-  "transcriptionServiceInvalid": "The address must start with http:// or https://"
+  "transcriptionServiceInvalid": "The address must start with http:// or https://",
+  "updateCancelDownload": "Cancel download",
+  "updateInstallNow": "Install",
+  "updateRetry": "Retry",
+  "updateInstalling": "Installing…",
+  "updateDownloadDone": "{size} downloaded",
+  "@updateDownloadDone": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "clearCache": "Clear cache",
+  "cacheApk": "Installers",
+  "cacheImages": "Image cache",
+  "cacheTemp": "Temporary files",
+  "cacheTotal": "{size} in total",
+  "@cacheTotal": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "cacheKeepNote": "Chats and login data are never cleared.",
+  "clearCacheNow": "Clear all",
+  "clearingCache": "Clearing…",
+  "clearedCacheSize": "Cleared {size}",
+  "@clearedCacheSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "asrConnected": "Connected",
+  "asrUnreachable": "Cannot reach the service, check the address",
+  "transcribeFailedWith": "Transcription failed ({reason}), tap to retry",
+  "@transcribeFailedWith": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  }
 }

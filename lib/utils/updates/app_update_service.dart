@@ -198,18 +198,77 @@ class AppUpdateService {
       '${date.month.toString().padLeft(2, '0')}-'
       '${date.day.toString().padLeft(2, '0')}';
 
-  /// 下载并调起安装器。[onProgress] 的取值是 0~1。
-  static Future<void> downloadAndInstall(
-    AppUpdateInfo info, {
-    ValueChanged<double>? onProgress,
-  }) async {
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/FluffyChatX-${info.versionName}.apk');
-    if (await file.exists()) {
-      await file.delete();
+  /// 安装包放在 **cache/update**，不是应用支持目录。
+  ///
+  /// 支持目录（`getApplicationSupportDirectory`）是用户数据，系统永不回收，
+  /// 之前把 APK 放那里，几个版本下来能攒几百 MB。
+  static Future<Directory> updateDir() async {
+    final cache = await getTemporaryDirectory();
+    final dir = Directory('${cache.path}/update');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
+  /// 删掉 `cache/update` 里的所有 apk。
+  ///
+  /// 下载前先清一次（保证同时最多只有一个包），启动后也清一次
+  /// （装完之后那个包要等下一次启动再删——安装器在另一个进程里干活，
+  /// 立刻删会让「安装失败再点一次」没得点）。
+  static Future<void> cleanupUpdateDir() async {
+    try {
+      final dir = await updateDir();
+      await for (final entity in dir.list()) {
+        if (entity is! File || !entity.path.endsWith('.apk')) continue;
+        try {
+          await entity.delete();
+        } catch (_) {
+          // 可能正被安装器读取，跳过。
+        }
+      }
+    } catch (e, s) {
+      Logs().w('[Update] 清理安装包失败', e, s);
+    }
+  }
+
+  /// 当前下载状态。写在静态变量里，切走 App 再回来还能接着看。
+  static final ValueNotifier<UpdateDownloadState> downloadState =
+      ValueNotifier<UpdateDownloadState>(const UpdateDownloadState());
+
+  static http.Client? _downloadClient;
+  static bool _cancelled = false;
+
+  /// 下载安装包到 `cache/update`，完成后状态变成 [UpdateDownloadStatus.downloaded]。
+  static Future<void> startDownload(AppUpdateInfo info) async {
+    final current = downloadState.value;
+    if (current.status == UpdateDownloadStatus.downloading ||
+        current.status == UpdateDownloadStatus.installing) {
+      return;
+    }
+    if (current.status == UpdateDownloadStatus.downloaded &&
+        current.filePath != null &&
+        await File(current.filePath!).exists()) {
+      return;
     }
 
-    final client = http.Client();
+    _cancelled = false;
+    await cleanupUpdateDir();
+
+    final dir = await updateDir();
+    final file = File('${dir.path}/FluffyChatX-${info.versionName}.apk');
+    final total = info.size;
+    downloadState.value = UpdateDownloadState(
+      status: UpdateDownloadStatus.downloading,
+      totalBytes: total,
+      filePath: file.path,
+    );
+
+    final client = _downloadClient = http.Client();
+    var received = 0;
+    var lastTick = DateTime.now();
+    var lastReceived = 0;
+
     try {
       final request = http.Request('GET', info.apkUri);
       final response = await client
@@ -221,48 +280,188 @@ class AppUpdateService {
           'HTTP ${response.statusCode}',
         );
       }
-      final total = response.contentLength ?? info.size;
-      var received = 0;
+      final contentLength = response.contentLength ?? total;
       final sink = file.openWrite();
       try {
         await for (final chunk in response.stream) {
+          if (_cancelled) break;
           sink.add(chunk);
           received += chunk.length;
-          if (total > 0) {
-            onProgress?.call((received / total).clamp(0.0, 1.0));
+          final now = DateTime.now();
+          final elapsed = now.difference(lastTick).inMilliseconds;
+          if (elapsed >= 500) {
+            final speed = (received - lastReceived) * 1000 / elapsed;
+            lastTick = now;
+            lastReceived = received;
+            downloadState.value = downloadState.value.copyWith(
+              progress: contentLength > 0
+                  ? (received / contentLength).clamp(0.0, 1.0)
+                  : 0,
+              receivedBytes: received,
+              bytesPerSecond: speed,
+            );
+          } else if (contentLength > 0) {
+            downloadState.value = downloadState.value.copyWith(
+              progress: (received / contentLength).clamp(0.0, 1.0),
+              receivedBytes: received,
+            );
           }
         }
       } finally {
         await sink.close();
       }
+
+      if (_cancelled) {
+        if (await file.exists()) await file.delete();
+        downloadState.value = const UpdateDownloadState();
+        return;
+      }
       if (received == 0) {
         throw const AppUpdateException(AppUpdateError.network, 'empty body');
       }
-    } on AppUpdateException {
-      rethrow;
-    } on Exception catch (e, s) {
+    } on AppUpdateException catch (e) {
+      if (await file.exists()) await file.delete();
+      downloadState.value = UpdateDownloadState(
+        status: UpdateDownloadStatus.failed,
+        error: e.error,
+        errorDetail: e.detail,
+      );
+      return;
+    } catch (e, s) {
       Logs().w('[Update] 下载安装包失败', e, s);
-      if (await file.exists()) {
-        await file.delete();
+      if (await file.exists()) await file.delete();
+      if (_cancelled) {
+        downloadState.value = const UpdateDownloadState();
+      } else {
+        downloadState.value = UpdateDownloadState(
+          status: UpdateDownloadStatus.failed,
+          error: AppUpdateError.network,
+          errorDetail: e.toString(),
+        );
       }
-      throw AppUpdateException(AppUpdateError.network, e.toString());
+      return;
     } finally {
       client.close();
+      _downloadClient = null;
     }
 
     if (info.sha256.isNotEmpty) {
       final digest = await sha256.bind(file.openRead()).first;
       if (digest.toString().toUpperCase() != info.sha256.toUpperCase()) {
         await file.delete();
-        throw const AppUpdateException(AppUpdateError.checksum);
+        downloadState.value = const UpdateDownloadState(
+          status: UpdateDownloadStatus.failed,
+          error: AppUpdateError.checksum,
+        );
+        return;
       }
     }
-    onProgress?.call(1);
 
+    downloadState.value = downloadState.value.copyWith(
+      status: UpdateDownloadStatus.downloaded,
+      progress: 1,
+      receivedBytes: received,
+      filePath: file.path,
+      bytesPerSecond: 0,
+      clearError: true,
+    );
+  }
+
+  /// 取消下载（正在写的文件会被删掉）。
+  static Future<void> cancelDownload() async {
+    if (downloadState.value.status != UpdateDownloadStatus.downloading) return;
+    _cancelled = true;
+    _downloadClient?.close();
+  }
+
+  /// 调起系统安装器。**不删文件**，等下次启动清理。
+  static Future<void> installDownloaded() async {
+    final path = downloadState.value.filePath;
+    if (path == null) {
+      downloadState.value = const UpdateDownloadState(
+        status: UpdateDownloadStatus.failed,
+        error: AppUpdateError.install,
+        errorDetail: 'no file',
+      );
+      return;
+    }
+    final file = File(path);
+    if (!await file.exists()) {
+      downloadState.value = const UpdateDownloadState(
+        status: UpdateDownloadStatus.failed,
+        error: AppUpdateError.install,
+        errorDetail: 'missing file',
+      );
+      return;
+    }
+
+    downloadState.value = downloadState.value.copyWith(
+      status: UpdateDownloadStatus.installing,
+    );
     final result = await OpenFilex.open(file.path);
     if (result.type != ResultType.done) {
       Logs().w('[Update] 无法调起安装器: ${result.type} ${result.message}');
-      throw AppUpdateException(AppUpdateError.install, result.message);
+      downloadState.value = downloadState.value.copyWith(
+        status: UpdateDownloadStatus.failed,
+        error: AppUpdateError.install,
+        errorDetail: result.message,
+      );
     }
+  }
+
+  /// 关闭弹窗后把状态复位（已经下载好的不要复位，下次还能点安装）。
+  static void resetIdleIfFailed() {
+    if (downloadState.value.status == UpdateDownloadStatus.failed) {
+      downloadState.value = const UpdateDownloadState();
+    }
+  }
+}
+
+/// 下载阶段的状态机。
+enum UpdateDownloadStatus { idle, downloading, downloaded, installing, failed }
+
+@immutable
+class UpdateDownloadState {
+  const UpdateDownloadState({
+    this.status = UpdateDownloadStatus.idle,
+    this.progress = 0,
+    this.receivedBytes = 0,
+    this.totalBytes = 0,
+    this.bytesPerSecond = 0,
+    this.filePath,
+    this.error,
+    this.errorDetail,
+  });
+
+  final UpdateDownloadStatus status;
+  final double progress;
+  final int receivedBytes;
+  final int totalBytes;
+  final double bytesPerSecond;
+  final String? filePath;
+  final AppUpdateError? error;
+  final String? errorDetail;
+
+  UpdateDownloadState copyWith({
+    UpdateDownloadStatus? status,
+    double? progress,
+    int? receivedBytes,
+    int? totalBytes,
+    double? bytesPerSecond,
+    String? filePath,
+    AppUpdateError? error,
+    String? errorDetail,
+    bool clearError = false,
+  }) {
+    return UpdateDownloadState(
+      status: status ?? this.status,
+      progress: progress ?? this.progress,
+      receivedBytes: receivedBytes ?? this.receivedBytes,
+      totalBytes: totalBytes ?? this.totalBytes,
+      bytesPerSecond: bytesPerSecond ?? this.bytesPerSecond,
+      filePath: filePath ?? this.filePath,
+      error: clearError ? null : (error ?? this.error),
+      errorDetail: clearError ? null : (errorDetail ?? this.errorDetail),
+    );
   }
 }
