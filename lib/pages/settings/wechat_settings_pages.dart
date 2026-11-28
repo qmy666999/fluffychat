@@ -13,6 +13,7 @@ import 'package:fluffychat/utils/notifications/notification_log.dart';
 import 'package:fluffychat/utils/updates/app_update_service.dart';
 import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
+import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
 import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
@@ -291,6 +292,28 @@ class SettingsChatPage extends StatefulWidget {
 }
 
 class _SettingsChatPageState extends State<SettingsChatPage> {
+  Future<void> _editTranscriptionUrl() async {
+    final l10n = L10n.of(context);
+    final result = await showTextInputDialog(
+      context: context,
+      title: l10n.transcriptionService,
+      hintText: WechatPrefs.defaultTranscriptionUrl,
+      initialText: WechatPrefs.transcriptionUrl,
+      useRootNavigator: false,
+      autocorrect: false,
+      keyboardType: TextInputType.url,
+    );
+    if (result == null) return;
+    final trimmed = result.trim();
+    if (trimmed.isNotEmpty && !trimmed.startsWith('http')) {
+      AppToast.show(l10n.transcriptionServiceInvalid, isError: true);
+      return;
+    }
+    await WechatPrefs.setTranscriptionUrl(trimmed);
+    if (!mounted) return;
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = L10n.of(context);
@@ -333,6 +356,16 @@ class _SettingsChatPageState extends State<SettingsChatPage> {
           subtitle: Text(l10n.featureComingSoon),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => _showComingSoon(context),
+        ),
+        ListTile(
+          title: Text(l10n.transcriptionService),
+          subtitle: Text(
+            WechatPrefs.transcriptionUrl.trim().isEmpty
+                ? l10n.transcriptionServiceOff
+                : WechatPrefs.transcriptionUrl,
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _editTranscriptionUrl,
         ),
         ListTile(
           title: Text(l10n.fontSize),

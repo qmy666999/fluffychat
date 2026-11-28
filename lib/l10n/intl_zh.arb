@@ -3360,5 +3360,14 @@
   "exportLogsDone": "已导出到 Download 目录",
   "exportLogsFailed": "导出失败",
   "diagExportEmpty": "还没有日志",
-  "readAloud": "朗读"
+  "readAloud": "朗读",
+  "transcribe": "转文字",
+  "transcribing": "转文字中…",
+  "transcribeFailed": "转文字失败，点一下重试",
+  "transcribeExpand": "展开",
+  "transcribeCollapse": "收起",
+  "transcriptionService": "语音转文字服务",
+  "transcriptionServiceHint": "留空则关闭这个功能（长按语音不会有「转文字」）",
+  "transcriptionServiceOff": "未配置（已关闭）",
+  "transcriptionServiceInvalid": "地址要以 http:// 或 https:// 开头"
 }

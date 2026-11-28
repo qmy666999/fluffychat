@@ -14,6 +14,7 @@ import 'package:fluffychat/utils/stickers/sticker_service.dart';
 import 'package:fluffychat/utils/wechat/message_retry.dart';
 import 'package:fluffychat/utils/wechat/reminder_service.dart';
 import 'package:fluffychat/utils/wechat/speech_service.dart';
+import 'package:fluffychat/utils/wechat/transcription_service.dart';
 import 'package:fluffychat/widgets/animations/message_shatter.dart';
 import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/share_scaffold_dialog.dart';
@@ -93,6 +94,12 @@ Future<void> showMessageActionsMenu(
         icon: Icons.download_outlined,
         label: l10n.save,
         onTap: () => event.saveFile(context),
+      ),
+    if (event.messageType == MessageTypes.Audio && TranscriptionService.enabled)
+      _MessageAction(
+        icon: Icons.translate,
+        label: l10n.transcribe,
+        onTap: () => TranscriptionService.transcribe(event),
       ),
     if (event.messageType == MessageTypes.Sticker)
       _MessageAction(

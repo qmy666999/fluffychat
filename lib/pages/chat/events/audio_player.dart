@@ -10,6 +10,7 @@ import 'package:fluffychat/utils/error_reporter.dart';
 import 'package:fluffychat/utils/file_description.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/utils/url_launcher.dart';
+import 'package:fluffychat/utils/wechat/transcription_service.dart';
 import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
@@ -21,6 +22,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../widgets/fluffy_chat_app.dart';
 import '../../../widgets/matrix.dart';
+import 'transcription_bubble.dart';
 
 /// 微信样式的语音气泡：一个胶囊，里面是时长（例如 `2"`）和一个喇叭图标。
 /// 宽度随时长变化，没有进度条，点击气泡播放 / 暂停。
@@ -360,6 +362,20 @@ class AudioPlayerState extends State<AudioPlayerWidget>
                   ),
                 ),
               ),
+            ),
+            ValueListenableBuilder<int>(
+              valueListenable: TranscriptionService.revision,
+              builder: (context, _, _) {
+                final entry = TranscriptionService.entryOf(
+                  widget.event.eventId,
+                );
+                if (entry == null) return const SizedBox.shrink();
+                return TranscriptionBubble(
+                  entry: entry,
+                  color: widget.color,
+                  onRetry: () => TranscriptionService.transcribe(widget.event),
+                );
+              },
             ),
             if (fileDescription != null)
               Padding(

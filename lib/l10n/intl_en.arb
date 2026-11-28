@@ -3360,5 +3360,14 @@
   "exportLogsDone": "Exported to the Downloads folder",
   "exportLogsFailed": "Export failed",
   "diagExportEmpty": "No logs yet",
-  "readAloud": "Read aloud"
+  "readAloud": "Read aloud",
+  "transcribe": "Transcribe",
+  "transcribing": "Transcribing…",
+  "transcribeFailed": "Transcription failed, tap to retry",
+  "transcribeExpand": "Show more",
+  "transcribeCollapse": "Show less",
+  "transcriptionService": "Speech-to-text service",
+  "transcriptionServiceHint": "Leave empty to disable transcription",
+  "transcriptionServiceOff": "Not configured (off)",
+  "transcriptionServiceInvalid": "The address must start with http:// or https://"
 }

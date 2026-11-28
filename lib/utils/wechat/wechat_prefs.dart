@@ -67,6 +67,20 @@ class WechatPrefs {
     await _store?.setBool(_sendOriginalImagesKey, value);
   }
 
+  // ------------------------------------------------------------ 语音转文字
+
+  static const String _transcriptionUrlKey = 'wechat_transcription_url';
+
+  /// 语音转文字服务地址（留空 = 关闭这个功能，长按菜单里不显示入口）。
+  static String get transcriptionUrl =>
+      _store?.getString(_transcriptionUrlKey) ?? defaultTranscriptionUrl;
+
+  static const String defaultTranscriptionUrl = 'http://192.168.31.154:9100';
+
+  static Future<void> setTranscriptionUrl(String value) async {
+    await _store?.setString(_transcriptionUrlKey, value.trim());
+  }
+
   // ------------------------------------------------------------ 消息提醒
 
   static const String _notifyReceiveKey = 'wechat_notify_receive';
