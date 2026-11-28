@@ -9,7 +9,7 @@ import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat/events/poll.dart';
 import 'package:fluffychat/pages/chat/events/video_player.dart';
-import 'package:fluffychat/pages/image_viewer/image_viewer.dart';
+import 'package:fluffychat/pages/image_viewer/show_image_viewer.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
@@ -91,14 +91,9 @@ class MessageContent extends StatelessWidget {
               borderRadius: borderRadius,
               timeline: timeline,
               textColor: textColor,
-              onTap: () => showDialog(
-                context: context,
-                builder: (_) => ImageViewer(
-                  event,
-                  timeline: timeline,
-                  outerContext: context,
-                ),
-              ),
+              // 全屏预览走真正的路由（不是 showDialog），返回键才会先关图。
+              onTap: () =>
+                  showImageViewer(context, event: event, timeline: timeline),
             );
           case CuteEventContent.eventType:
             return CuteContent(event);

@@ -13,11 +13,11 @@ import 'package:fluffychat/pages/chat/encryption_info.dart';
 import 'package:fluffychat/pages/chat/events/message.dart';
 import 'package:fluffychat/pages/chat/seen_by_row.dart';
 import 'package:fluffychat/pages/chat/typing_indicators.dart';
+import 'package:fluffychat/pages/image_viewer/show_image_viewer.dart';
 import 'package:fluffychat/utils/account_config.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/filtered_timeline_extension.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/widgets/avatar.dart';
-import 'package:fluffychat/widgets/mxc_image_viewer.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 import 'package:scroll_to_index/scroll_to_index.dart';
@@ -65,10 +65,7 @@ class ChatEventList extends StatelessWidget {
                 name: room.getLocalizedDisplayname(),
                 size: Avatar.defaultSize * 2.5,
                 onTap: roomAvatar != null
-                    ? () => showDialog(
-                        context: context,
-                        builder: (_) => MxcImageViewer(roomAvatar),
-                      )
+                    ? () => showMxcImageViewer(context, roomAvatar)
                     : null,
                 borderRadius: room.isSpace
                     ? BorderRadius.circular(AppConfig.spaceBorderRadius * 2.5)

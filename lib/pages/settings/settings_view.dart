@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/image_viewer/show_image_viewer.dart';
 import 'package:fluffychat/utils/fluffy_share.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/widgets/avatar.dart';
@@ -12,7 +13,6 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
-import '../../widgets/mxc_image_viewer.dart';
 import 'settings.dart';
 
 /// 微信式「设置」：一层只放分组入口，具体开关都在二级页里。
@@ -173,10 +173,7 @@ class _ProfileHeader extends StatelessWidget {
                   size: Avatar.defaultSize * 2.5,
                   animated: true,
                   onTap: avatar != null
-                      ? () => showDialog(
-                          context: context,
-                          builder: (_) => MxcImageViewer(avatar),
-                        )
+                      ? () => showMxcImageViewer(context, avatar)
                       : null,
                 ),
                 if (profile != null)

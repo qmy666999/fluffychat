@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/image_viewer/show_image_viewer.dart';
 import 'package:fluffychat/utils/fluffy_share.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
@@ -19,7 +20,6 @@ import '../avatar.dart';
 import '../future_loading_dialog.dart';
 import '../hover_builder.dart';
 import '../matrix.dart';
-import '../mxc_image_viewer.dart';
 import 'adaptive_dialog_action.dart';
 
 class PublicRoomDialog extends StatelessWidget {
@@ -123,10 +123,7 @@ class PublicRoomDialog extends StatelessWidget {
                         name: profile?.name ?? roomLink,
                         size: Avatar.defaultSize * 1.5,
                         onTap: avatar != null
-                            ? () => showDialog(
-                                context: context,
-                                builder: (_) => MxcImageViewer(avatar),
-                              )
+                            ? () => showMxcImageViewer(context, avatar)
                             : null,
                       ),
                       Expanded(

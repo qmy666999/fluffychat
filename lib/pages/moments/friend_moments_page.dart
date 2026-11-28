@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/moments/moment_gallery_page.dart';
 import 'package:fluffychat/pages/moments/moment_image.dart';
 import 'package:fluffychat/pages/moments/moment_model.dart';
 import 'package:fluffychat/utils/moments/moments_service.dart';
@@ -133,17 +134,8 @@ class _FriendMomentsPageState extends State<FriendMomentsPage> {
               itemCount: groups.length,
               itemBuilder: (context, i) => _DateGroup(
                 group: groups[i],
-                onOpenImage: (uri) => showDialog(
-                  context: context,
-                  builder: (_) => Dialog(
-                    // 点开看大图：要原图
-                    child: MomentImage(
-                      uri: uri,
-                      fit: BoxFit.contain,
-                      original: true,
-                    ),
-                  ),
-                ),
+                onOpenImage: (uri) =>
+                    showMomentGallery(context, images: [uri], index: 0),
               ),
             ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),

@@ -60,6 +60,66 @@ class ImageViewerController extends State<ImageViewer> {
 
   late final List<Event> allEvents;
 
+  /// 每张图一个变换控制器，用来判断当前是否被放大（放大时不要响应下拉关闭）。
+  final Map<int, TransformationController> _transformationControllers = {};
+
+  TransformationController transformControllerFor(int index) =>
+      _transformationControllers.putIfAbsent(
+        index,
+        TransformationController.new,
+      );
+
+  double _dragOffset = 0;
+
+  /// 手指向下拖动的距离，>0 时整页跟着下移。
+  double get dragOffset => _dragOffset;
+
+  Offset? _pointerStart;
+  int _activePointers = 0;
+
+  bool get _zoomed =>
+      transformControllerFor(_index).value.getMaxScaleOnAxis() > 1.05;
+
+  void onPointerDown(PointerDownEvent event) {
+    _activePointers++;
+    _pointerStart ??= event.position;
+  }
+
+  void onPointerMove(PointerMoveEvent event) {
+    final start = _pointerStart;
+    if (start == null || _activePointers != 1 || _zoomed) return;
+    final delta = event.position - start;
+    // 横向滑动交给 PageView 翻页，只有明显向下才跟随手指。
+    if (delta.dy <= 0 || delta.dy < delta.dx.abs()) {
+      if (_dragOffset != 0) setState(() => _dragOffset = 0);
+      return;
+    }
+    setState(() => _dragOffset = delta.dy);
+  }
+
+  void onPointerUp(PointerUpEvent event) {
+    _activePointers = (_activePointers - 1).clamp(0, 8);
+    final start = _pointerStart;
+    _pointerStart = null;
+    if (start == null) return;
+    final delta = event.position - start;
+    final threshold = MediaQuery.sizeOf(context).height * 0.16;
+    final shouldClose =
+        _dragOffset > threshold ||
+        (delta.dy > threshold && delta.dy > delta.dx.abs() * 1.5);
+    if (shouldClose) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    if (_dragOffset != 0) setState(() => _dragOffset = 0);
+  }
+
+  void onPointerCancel(PointerCancelEvent event) {
+    _activePointers = (_activePointers - 1).clamp(0, 8);
+    _pointerStart = null;
+    if (_dragOffset != 0) setState(() => _dragOffset = 0);
+  }
+
   void onKeyEvent(KeyEvent event) {
     switch (event.logicalKey) {
       case LogicalKeyboardKey.arrowLeft:
@@ -117,7 +177,7 @@ class ImageViewerController extends State<ImageViewer> {
     if (PlatformInfos.usesTouchscreen == false) {
       if (endDetails.velocity.pixelsPerSecond.dy >
           MediaQuery.sizeOf(context).height * maxScaleFactor) {
-        Navigator.of(context, rootNavigator: false).pop();
+        Navigator.of(context).maybePop();
       }
     }
   }
@@ -126,6 +186,10 @@ class ImageViewerController extends State<ImageViewer> {
   void dispose() {
     focusNode.dispose();
     pageController.dispose();
+    for (final controller in _transformationControllers.values) {
+      controller.dispose();
+    }
+    _transformationControllers.clear();
     super.dispose();
   }
 

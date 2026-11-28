@@ -4,11 +4,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/image_viewer/show_image_viewer.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/url_launcher.dart';
 import 'package:fluffychat/widgets/layouts/max_width_body.dart';
 import 'package:fluffychat/widgets/mxc_image.dart';
-import 'package:fluffychat/widgets/mxc_image_viewer.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -366,8 +366,7 @@ class _EmoteImage extends StatelessWidget {
     final key = 'sticker_preview_$mxc';
     return InkWell(
       borderRadius: BorderRadius.circular(4),
-      onTap: () =>
-          showDialog(context: context, builder: (_) => MxcImageViewer(mxc)),
+      onTap: () => showMxcImageViewer(context, mxc),
       child: MxcImage(
         key: ValueKey(key),
         cacheKey: key,

@@ -17,7 +17,7 @@ import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
-import '../../image_viewer/image_viewer.dart';
+import '../../image_viewer/show_image_viewer.dart';
 
 class EventVideoPlayer extends StatelessWidget {
   final Event event;
@@ -67,15 +67,9 @@ class EventVideoPlayer extends StatelessWidget {
           color: Colors.black,
           borderRadius: BorderRadius.circular(AppConfig.borderRadius),
           child: InkWell(
+            // 视频封面点开也走图片预览路由。
             onTap: () => supportsVideoPlayer
-                ? showDialog(
-                    context: context,
-                    builder: (_) => ImageViewer(
-                      event,
-                      timeline: timeline,
-                      outerContext: context,
-                    ),
-                  )
+                ? showImageViewer(context, event: event, timeline: timeline)
                 : event.saveFile(context),
             borderRadius: BorderRadius.circular(AppConfig.borderRadius),
             child: SizedBox(

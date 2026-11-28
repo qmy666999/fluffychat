@@ -25,140 +25,164 @@ class ImageViewerView extends StatelessWidget {
       backgroundColor: Colors.black.withAlpha(200),
       foregroundColor: Colors.white,
     );
-    return GestureDetector(
-      onTap: () => Navigator.of(context).pop(),
-      child: Scaffold(
-        backgroundColor: Colors.black.withAlpha(128),
-        extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          elevation: 0,
-          leading: IconButton(
-            style: iconButtonStyle,
-            icon: const Icon(Icons.close),
-            onPressed: Navigator.of(context).pop,
-            color: Colors.white,
-            tooltip: L10n.of(context).close,
-          ),
-          backgroundColor: Colors.transparent,
-          actions: [
-            IconButton(
-              style: iconButtonStyle,
-              icon: const Icon(Icons.reply_outlined),
-              onPressed: controller.forwardAction,
-              color: Colors.white,
-              tooltip: L10n.of(context).share,
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              style: iconButtonStyle,
-              icon: const Icon(Icons.download_outlined),
-              onPressed: () => controller.saveFileAction(context),
-              color: Colors.white,
-              tooltip: L10n.of(context).downloadFile,
-            ),
-            const SizedBox(width: 8),
-            if (PlatformInfos.isMobile)
-              // Use builder context to correctly position the share dialog on iPad
-              Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: Builder(
-                  builder: (context) => IconButton(
+    // 向下拖动也能关（微信习惯）。这里用 Listener 拿原始指针事件：
+    // 它不参与手势竞技场，所以不会影响缩放和左右翻页。
+    final dragOffset = controller.dragOffset;
+    return Listener(
+      onPointerDown: controller.onPointerDown,
+      onPointerMove: controller.onPointerMove,
+      onPointerUp: controller.onPointerUp,
+      onPointerCancel: controller.onPointerCancel,
+      child: Transform.translate(
+        offset: Offset(0, dragOffset),
+        child: Opacity(
+          opacity: (1 - dragOffset / (MediaQuery.sizeOf(context).height * 0.5))
+              .clamp(0.35, 1.0),
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).maybePop(),
+            child: Scaffold(
+              backgroundColor: Colors.black.withAlpha(128),
+              extendBodyBehindAppBar: true,
+              appBar: AppBar(
+                elevation: 0,
+                leading: IconButton(
+                  style: iconButtonStyle,
+                  icon: const Icon(Icons.close),
+                  onPressed: Navigator.of(context).pop,
+                  color: Colors.white,
+                  tooltip: L10n.of(context).close,
+                ),
+                backgroundColor: Colors.transparent,
+                actions: [
+                  IconButton(
                     style: iconButtonStyle,
-                    onPressed: () => controller.shareFileAction(context),
-                    tooltip: L10n.of(context).share,
+                    icon: const Icon(Icons.reply_outlined),
+                    onPressed: controller.forwardAction,
                     color: Colors.white,
-                    icon: Icon(Icons.adaptive.share_outlined),
+                    tooltip: L10n.of(context).share,
                   ),
-                ),
-              ),
-          ],
-        ),
-        body: HoverBuilder(
-          builder: (context, hovered) => Stack(
-            children: [
-              KeyboardListener(
-                focusNode: controller.focusNode,
-                onKeyEvent: controller.onKeyEvent,
-                child: PointersListener(
-                  builder: (context, moreThanOnePointer) => PageView.builder(
-                    physics: !moreThanOnePointer
-                        ? BouncingScrollPhysics()
-                        : NeverScrollableScrollPhysics(),
-                    scrollDirection: Axis.horizontal,
-                    controller: controller.pageController,
-                    itemCount: controller.allEvents.length,
-                    itemBuilder: (context, i) {
-                      final event = controller.allEvents[i];
-                      switch (event.messageType) {
-                        case MessageTypes.Video:
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 52.0),
-                            child: Center(
-                              child: GestureDetector(
-                                // Ignore taps to not go back here:
-                                onTap: () {},
-                                child: EventVideoPlayer(event),
-                              ),
-                            ),
-                          );
-                        case MessageTypes.Image:
-                        case MessageTypes.Sticker:
-                        default:
-                          return InteractiveViewer(
-                            minScale: 1.0,
-                            maxScale: 10.0,
-                            onInteractionEnd: controller.onInteractionEnds,
-                            child: Center(
-                              child: Hero(
-                                tag: event.eventId,
-                                child: GestureDetector(
-                                  // Ignore taps to not go back here:
-                                  onTap: () {},
-                                  child: MxcImage(
-                                    key: ValueKey(event.eventId),
-                                    event: event,
-                                    fit: BoxFit.contain,
-                                    isThumbnail: false,
-                                    animated: true,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                      }
-                    },
+                  const SizedBox(width: 8),
+                  IconButton(
+                    style: iconButtonStyle,
+                    icon: const Icon(Icons.download_outlined),
+                    onPressed: () => controller.saveFileAction(context),
+                    color: Colors.white,
+                    tooltip: L10n.of(context).downloadFile,
                   ),
-                ),
-              ),
-              if (hovered) ...[
-                if (controller.canGoBack)
-                  Align(
-                    alignment: .centerLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: IconButton(
-                        style: iconButtonStyle,
-                        tooltip: L10n.of(context).previous,
-                        icon: const Icon(Icons.keyboard_arrow_left_outlined),
-                        onPressed: controller.prevImage,
+                  const SizedBox(width: 8),
+                  if (PlatformInfos.isMobile)
+                    // Use builder context to correctly position the share dialog on iPad
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: Builder(
+                        builder: (context) => IconButton(
+                          style: iconButtonStyle,
+                          onPressed: () => controller.shareFileAction(context),
+                          tooltip: L10n.of(context).share,
+                          color: Colors.white,
+                          icon: Icon(Icons.adaptive.share_outlined),
+                        ),
                       ),
                     ),
-                  ),
-                if (controller.canGoNext)
-                  Align(
-                    alignment: .centerRight,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: IconButton(
-                        style: iconButtonStyle,
-                        tooltip: L10n.of(context).next,
-                        icon: const Icon(Icons.keyboard_arrow_right_outlined),
-                        onPressed: controller.nextImage,
+                ],
+              ),
+              body: HoverBuilder(
+                builder: (context, hovered) => Stack(
+                  children: [
+                    KeyboardListener(
+                      focusNode: controller.focusNode,
+                      onKeyEvent: controller.onKeyEvent,
+                      child: PointersListener(
+                        builder: (context, moreThanOnePointer) =>
+                            PageView.builder(
+                              physics: !moreThanOnePointer
+                                  ? BouncingScrollPhysics()
+                                  : NeverScrollableScrollPhysics(),
+                              scrollDirection: Axis.horizontal,
+                              controller: controller.pageController,
+                              itemCount: controller.allEvents.length,
+                              itemBuilder: (context, i) {
+                                final event = controller.allEvents[i];
+                                switch (event.messageType) {
+                                  case MessageTypes.Video:
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 52.0),
+                                      child: Center(
+                                        child: GestureDetector(
+                                          // Ignore taps to not go back here:
+                                          onTap: () {},
+                                          child: EventVideoPlayer(event),
+                                        ),
+                                      ),
+                                    );
+                                  case MessageTypes.Image:
+                                  case MessageTypes.Sticker:
+                                  default:
+                                    return InteractiveViewer(
+                                      minScale: 1.0,
+                                      maxScale: 10.0,
+                                      transformationController: controller
+                                          .transformControllerFor(i),
+                                      onInteractionEnd:
+                                          controller.onInteractionEnds,
+                                      child: Center(
+                                        child: Hero(
+                                          tag: event.eventId,
+                                          child: GestureDetector(
+                                            // Ignore taps to not go back here:
+                                            onTap: () {},
+                                            child: MxcImage(
+                                              key: ValueKey(event.eventId),
+                                              event: event,
+                                              fit: BoxFit.contain,
+                                              isThumbnail: false,
+                                              animated: true,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                }
+                              },
+                            ),
                       ),
                     ),
-                  ),
-              ],
-            ],
+                    if (hovered) ...[
+                      if (controller.canGoBack)
+                        Align(
+                          alignment: .centerLeft,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: IconButton(
+                              style: iconButtonStyle,
+                              tooltip: L10n.of(context).previous,
+                              icon: const Icon(
+                                Icons.keyboard_arrow_left_outlined,
+                              ),
+                              onPressed: controller.prevImage,
+                            ),
+                          ),
+                        ),
+                      if (controller.canGoNext)
+                        Align(
+                          alignment: .centerRight,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: IconButton(
+                              style: iconButtonStyle,
+                              tooltip: L10n.of(context).next,
+                              icon: const Icon(
+                                Icons.keyboard_arrow_right_outlined,
+                              ),
+                              onPressed: controller.nextImage,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),

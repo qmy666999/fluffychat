@@ -6,6 +6,7 @@
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/image_viewer/show_image_viewer.dart';
 import 'package:fluffychat/utils/date_time_extension.dart';
 import 'package:fluffychat/utils/fluffy_share.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/adaptive_dialog_action.dart';
@@ -22,7 +23,6 @@ import '../../utils/url_launcher.dart';
 import '../future_loading_dialog.dart';
 import '../hover_builder.dart';
 import '../matrix.dart';
-import '../mxc_image_viewer.dart';
 
 // ignore: unused_import
 
@@ -83,10 +83,7 @@ class UserDialog extends StatelessWidget {
                     size: Avatar.defaultSize * 1.5,
                     animated: true,
                     onTap: avatar != null
-                        ? () => showDialog(
-                            context: context,
-                            builder: (_) => MxcImageViewer(avatar),
-                          )
+                        ? () => showMxcImageViewer(context, avatar)
                         : null,
                   ),
                   Expanded(
