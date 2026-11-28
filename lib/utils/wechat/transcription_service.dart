@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:fluffychat/utils/diagnostics/action_logger.dart';
 import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -11,10 +12,13 @@ enum TranscriptionStatus { loading, done, failed }
 
 @immutable
 class TranscriptionEntry {
-  const TranscriptionEntry(this.status, [this.text = '']);
+  const TranscriptionEntry(this.status, [this.text = '', this.detail]);
 
   final TranscriptionStatus status;
   final String text;
+
+  /// 失败原因（HTTP 状态码 / 连接错误），显示在气泡下面。
+  final String? detail;
 }
 
 /// 语音转文字。
@@ -38,6 +42,40 @@ class TranscriptionService {
 
   /// 没配置服务地址时，长按菜单里不出现「转文字」。
   static bool get enabled => WechatPrefs.transcriptionUrl.trim().isNotEmpty;
+
+  /// 规范化服务地址：
+  /// - 缺 `http://` 自动补（用户很可能只填 `192.168.31.154:9100`）
+  /// - 去掉结尾的 `/`
+  /// - 去掉结尾的 `/transcribe`（拼路径时会重复成 `/transcribe/transcribe`）
+  static String normalizeUrl(String raw) {
+    var value = raw.trim();
+    if (value.isEmpty) return value;
+    if (!value.startsWith('http://') && !value.startsWith('https://')) {
+      value = 'http://$value';
+    }
+    while (value.endsWith('/')) {
+      value = value.substring(0, value.length - 1);
+    }
+    if (value.endsWith('/transcribe')) {
+      value = value.substring(0, value.length - '/transcribe'.length);
+    }
+    return value;
+  }
+
+  /// 打 `/health` 判断服务是否可达（设置页保存时用）。
+  static Future<bool> testConnection() async {
+    final base = normalizeUrl(WechatPrefs.transcriptionUrl);
+    if (base.isEmpty) return false;
+    try {
+      final response = await http
+          .get(Uri.parse('$base/health'))
+          .timeout(const Duration(seconds: 8));
+      return response.statusCode >= 200 && response.statusCode < 300;
+    } catch (e) {
+      Logs().w('[asr] 连通性检查失败: $e');
+      return false;
+    }
+  }
 
   /// 读本地缓存（启动后第一次用到时调一次即可，重复调用没有副作用）。
   static void loadCache() {
@@ -83,8 +121,23 @@ class TranscriptionService {
       await _persist();
     } catch (e, s) {
       Logs().w('[asr] 转文字失败 event=${event.eventId}', e, s);
-      _set(event.eventId, const TranscriptionEntry(TranscriptionStatus.failed));
+      _set(
+        event.eventId,
+        TranscriptionEntry(TranscriptionStatus.failed, '', _describeError(e)),
+      );
     }
+  }
+
+  static String _describeError(Object error) {
+    final text = error.toString();
+    if (text.contains('Connection refused') || text.contains('拒绝')) {
+      return '连接被拒绝';
+    }
+    if (text.contains('TimeoutException') || text.contains('timed out')) {
+      return '超时';
+    }
+    if (text.contains('Failed host lookup')) return '找不到主机';
+    return text.length > 120 ? text.substring(0, 120) : text;
   }
 
   static void _set(String eventId, TranscriptionEntry entry) {
@@ -115,10 +168,7 @@ class TranscriptionService {
       downloadTimeout,
     );
 
-    final base = WechatPrefs.transcriptionUrl.trim().replaceAll(
-      RegExp(r'/+$'),
-      '',
-    );
+    final base = normalizeUrl(WechatPrefs.transcriptionUrl);
 
     // 兼容两种常见部署：直接 /transcribe，以及 OpenAI 风格的
     // /v1/audio/transcriptions（faster-whisper、whisper.cpp 之类）。
@@ -140,7 +190,18 @@ class TranscriptionService {
           continue;
         }
         if (response.statusCode < 200 || response.statusCode >= 300) {
-          throw Exception('HTTP ${response.statusCode}: ${response.body}');
+          final snippet = response.body.length > 200
+              ? response.body.substring(0, 200)
+              : response.body;
+          ActionLogger.I.log(
+            'asr_fail',
+            extra: {
+              'status': response.statusCode,
+              'body': snippet,
+              'endpoint': endpoint,
+            },
+          );
+          throw Exception('HTTP ${response.statusCode}');
         }
         return _textFrom(response.bodyBytes);
       } catch (e) {
@@ -156,9 +217,14 @@ class TranscriptionService {
     required String filename,
   }) async {
     final request = http.MultipartRequest('POST', Uri.parse(endpoint));
+    // 服务端要求的字段名是 audio（发 file= 会 422）。
     request.files.add(
-      http.MultipartFile.fromBytes('file', file.bytes, filename: filename),
+      http.MultipartFile.fromBytes('audio', file.bytes, filename: filename),
     );
+    final contentType = file.mimeType;
+    if (contentType.isNotEmpty) {
+      request.fields['mime'] = contentType;
+    }
     final streamed = await request.send().timeout(requestTimeout);
     return http.Response.fromStream(streamed);
   }

@@ -11,6 +11,7 @@ import 'package:fluffychat/utils/diagnostics/diag_exporter.dart';
 import 'package:fluffychat/utils/notifications/app_notifications.dart';
 import 'package:fluffychat/utils/notifications/notification_log.dart';
 import 'package:fluffychat/utils/updates/app_update_service.dart';
+import 'package:fluffychat/utils/wechat/transcription_service.dart';
 import 'package:fluffychat/utils/wechat/wechat_prefs.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
@@ -304,14 +305,18 @@ class _SettingsChatPageState extends State<SettingsChatPage> {
       keyboardType: TextInputType.url,
     );
     if (result == null) return;
-    final trimmed = result.trim();
-    if (trimmed.isNotEmpty && !trimmed.startsWith('http')) {
+    final normalized = TranscriptionService.normalizeUrl(result);
+    if (normalized.isEmpty) {
       AppToast.show(l10n.transcriptionServiceInvalid, isError: true);
       return;
     }
-    await WechatPrefs.setTranscriptionUrl(trimmed);
+    await WechatPrefs.setTranscriptionUrl(normalized);
     if (!mounted) return;
     setState(() {});
+    // 保存后立刻测连通，别等到转文字时才失败。
+    final ok = await TranscriptionService.testConnection();
+    if (!mounted) return;
+    AppToast.show(ok ? l10n.asrConnected : l10n.asrUnreachable, isError: !ok);
   }
 
   @override
@@ -362,7 +367,9 @@ class _SettingsChatPageState extends State<SettingsChatPage> {
           subtitle: Text(
             WechatPrefs.transcriptionUrl.trim().isEmpty
                 ? l10n.transcriptionServiceOff
-                : WechatPrefs.transcriptionUrl,
+                : TranscriptionService.normalizeUrl(
+                    WechatPrefs.transcriptionUrl,
+                  ),
           ),
           trailing: const Icon(Icons.chevron_right),
           onTap: _editTranscriptionUrl,
@@ -701,6 +708,13 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     return _WechatSettingsScaffold(
       title: l10n.storageSpace,
       children: [
+        ListTile(
+          leading: const Icon(Icons.delete_sweep_outlined),
+          title: Text(l10n.clearCache),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.go('/rooms/settings/cache'),
+        ),
+        const Divider(),
         ListTile(title: Text(l10n.joinedChats), trailing: Text('$joinedCount')),
         ListTile(
           title: Text(l10n.leftChats),

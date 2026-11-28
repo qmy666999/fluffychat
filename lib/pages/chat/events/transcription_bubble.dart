@@ -46,7 +46,7 @@ class _TranscriptionBubbleState extends State<TranscriptionBubble> {
           child: InkWell(
             onTap: widget.onRetry,
             child: Text(
-              l10n.transcribeFailed,
+              _failedText(l10n),
               style: baseStyle.copyWith(
                 color: Theme.of(context).colorScheme.error,
               ),
@@ -83,5 +83,11 @@ class _TranscriptionBubbleState extends State<TranscriptionBubble> {
           ),
         );
     }
+  }
+
+  String _failedText(L10n l10n) {
+    final detail = widget.entry.detail;
+    if (detail == null || detail.isEmpty) return l10n.transcribeFailed;
+    return l10n.transcribeFailedWith(detail);
   }
 }

@@ -39,6 +39,7 @@ import 'package:fluffychat/pages/moments/moments_page.dart';
 import 'package:fluffychat/pages/new_group/new_group.dart';
 import 'package:fluffychat/pages/new_private_chat/new_private_chat.dart';
 import 'package:fluffychat/pages/register/register.dart';
+import 'package:fluffychat/pages/settings/cache_clean_page.dart';
 import 'package:fluffychat/pages/settings/discover_manage_page.dart';
 import 'package:fluffychat/pages/settings/settings.dart';
 import 'package:fluffychat/pages/settings/wechat_settings_pages.dart';
@@ -474,6 +475,15 @@ abstract class AppRoutes {
                         context,
                         state,
                         const StorageSpacePage(),
+                      ),
+                      redirect: loggedOutRedirect,
+                    ),
+                    GoRoute(
+                      path: 'cache',
+                      pageBuilder: (context, state) => defaultPageBuilder(
+                        context,
+                        state,
+                        const CacheCleanPage(),
                       ),
                       redirect: loggedOutRedirect,
                     ),
