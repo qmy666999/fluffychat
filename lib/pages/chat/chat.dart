@@ -31,6 +31,7 @@ import 'package:fluffychat/utils/ogg_opus_remuxer.dart';
 import 'package:fluffychat/utils/other_party_can_receive.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/show_scaffold_dialog.dart';
+import 'package:fluffychat/utils/wechat/voice_playback.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
 import 'package:fluffychat/widgets/app_toast.dart';
@@ -699,6 +700,8 @@ class ChatController extends State<ChatPageWithRoom>
 
   @override
   void dispose() {
+    // 退出聊天页就停掉语音，避免声音跟着页面走后还在响。
+    unawaited(VoicePlayback.instance.stop());
     timeline?.cancelSubscriptions();
     timeline = null;
     _storeInputTimeoutTimer?.cancel();

@@ -3420,5 +3420,6 @@
   "viewDiagnosticsFailed": "Cannot open diagnostics",
   "updateInstallNoPermission": "The installer did not open. Allow \"Install unknown apps\" in Settings and try again",
   "updateInstallFileMissing": "The installer file is gone, please download again",
-  "saveImage": "Save image"
+  "saveImage": "Save image",
+  "voicePlaybackFailed": "Could not play the voice message. Tap to retry."
 }

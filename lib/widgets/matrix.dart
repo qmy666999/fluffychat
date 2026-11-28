@@ -30,7 +30,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/encryption.dart';
 import 'package:matrix/matrix.dart';
@@ -149,9 +148,6 @@ class MatrixState extends State<Matrix> {
   bool get hasComplexBundles => accountBundles.values.any((v) => v.length > 1);
 
   Client? _loginClientCandidate;
-
-  AudioPlayer? audioPlayer;
-  final ValueNotifier<String?> voiceMessageEventId = ValueNotifier(null);
 
   Future<Client> getLoginClient() async {
     if (widget.clients.isNotEmpty && !client.isLogged()) {
@@ -798,8 +794,6 @@ class MatrixState extends State<Matrix> {
     onUiaRequest.clear();
     onReceipts.clear();
     onTimelineEventSub.clear();
-
-    voiceMessageEventId.dispose();
 
     for (final c in widget.clients) {
       unawaited(MatrixVoip.of(c)?.dispose());
