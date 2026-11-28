@@ -33,6 +33,7 @@ import 'utils/diagnostics/diag_route_observer.dart';
 import 'utils/server_probe.dart';
 import 'utils/wechat/wechat_prefs.dart';
 import 'widgets/fluffy_chat_app.dart';
+import 'widgets/startup_failure_app.dart';
 
 ReceivePort? mainIsolateReceivePort;
 
@@ -40,7 +41,50 @@ bool _vodozemacInitialized = false;
 
 bool isIntegrationTest = false;
 
-void main(List<String> args) => runZonedGuarded(() async {
+/// 启动阶段最多等这么久：12 秒还没画出首帧就直接显示错误页，不再让人对着灰屏。
+const Duration _startupWatchdogTimeout = Duration(seconds: 12);
+
+/// `runApp` 有没有被调用过（含兜底页）。用来避免重复 runApp。
+bool _bootSettled = false;
+
+void main(List<String> args) => runZonedGuarded(
+  () async {
+    try {
+      await _boot(args);
+    } catch (e, s) {
+      // 启动路径上的任何异常都不能变成静默灰屏。
+      _reportStartupFailure(e, s);
+    }
+  },
+  (error, stack) {
+    ActionLogger.I.log(
+      'error',
+      extra: {'msg': '$error', 'stack': '$stack'},
+      stack: DiagRouteObserver.stack,
+    );
+    if (_bootSettled) {
+      // 跑起来之后的异常还是走原来的全局错误对话框。
+      ErrorReporter.onFlutterError(error, stack);
+      return;
+    }
+    _reportStartupFailure(error, stack);
+  },
+);
+
+/// 把启动失败变成一张能读、能复制的错误页，而不是灰屏。
+void _reportStartupFailure(Object error, StackTrace stack) {
+  debugPrint('FATAL startup: $error\n$stack');
+  if (_bootSettled) return;
+  _bootSettled = true;
+  try {
+    runApp(StartupFailureApp(error: '$error\n\n$stack'));
+  } catch (e, s) {
+    // 连兜底页都画不出来就只能留在 logcat 里了。
+    debugPrint('FATAL startup: unable to render failure page: $e\n$s');
+  }
+}
+
+Future<void> _boot(List<String> args) async {
   // 局域网入口是自签证书，只对私有网段放行，必须在任何 HttpClient 创建之前装上。
   installPrivateCertOverride();
 
@@ -92,13 +136,35 @@ void main(List<String> args) => runZonedGuarded(() async {
   // widget bindings are initialized already.
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 首帧没出来之前，任何 widget 构建异常都要能看见文字，不能是纯灰块。
+  ErrorWidget.builder = (details) =>
+      StartupErrorPanel(message: details.exceptionAsString());
+
+  // 启动看门狗：卡在 await 上超过 12 秒也强制给出一张错误页。
+  Timer(_startupWatchdogTimeout, () {
+    if (_bootSettled) return;
+    _reportStartupFailure(
+      '启动超过 ${_startupWatchdogTimeout.inSeconds} 秒还没画出首帧'
+      '（多半是启动路径上某个 await 卡住了）',
+      StackTrace.current,
+    );
+  });
+
   // 局域网优先：两个端点并行探测，各 2 秒封顶，最坏让启动慢 2 秒。
   await pickFastestServer();
   Logs().i('[ServerEndpoints] using ${ServerEndpoints.current}');
 
   final store = await AppSettings.init();
-  // 操作日志：要在任何界面之前初始化，才能把启动和早期错误记下来。
-  await initDiagnostics(store);
+  // 操作日志初始化是纯本地 IO：**不能 await**，它一旦卡住就是永久灰屏。
+  // 初始化完成之前的日志会被丢掉，这部分损失可以接受。
+  unawaited(
+    initDiagnostics(store).timeout(const Duration(seconds: 2)).catchError((
+      Object error,
+      StackTrace stack,
+    ) {
+      Logs().w('[diag] 日志初始化失败，跳过（不影响启动）', error, stack);
+    }),
+  );
   // 动效设置要在任何路由构造之前读进内存（路由里取的是静态字段，不能 await）。
   MotionSettings.load(store);
   WechatPrefs.init(store);
@@ -138,6 +204,8 @@ void main(List<String> args) => runZonedGuarded(() async {
     Logs().i(
       '${AppSettings.applicationName.value} started in background-fetch mode. No GUI will be created unless the app is no longer detached.',
     );
+    // 后台保活模式本来就**不画界面**，别让看门狗误报成「启动失败」。
+    _bootSettled = true;
     return;
   }
 
@@ -148,7 +216,7 @@ void main(List<String> args) => runZonedGuarded(() async {
     '${AppSettings.applicationName.value} started in foreground mode. Rendering GUI...',
   );
   await startGui(clients, store);
-}, ErrorReporter.onFlutterError);
+}
 
 /// Fetch the pincode for the applock and start the flutter engine.
 Future<void> startGui(List<Client> clients, SharedPreferences store) async {
@@ -174,13 +242,23 @@ Future<void> startGui(List<Client> clients, SharedPreferences store) async {
     JustAudioMediaKit.ensureInitialized();
   }
 
-  // Preload first client
+  // Preload first client（数据库预加载只是「快了更好」，卡住不能拖死启动）。
   final firstClient = clients.firstOrNull;
-  await firstClient?.roomsLoading;
-  await firstClient?.accountDataLoading;
+  try {
+    final roomsLoading = firstClient?.roomsLoading;
+    if (roomsLoading != null) {
+      await roomsLoading.timeout(const Duration(seconds: 3));
+    }
+    final accountDataLoading = firstClient?.accountDataLoading;
+    if (accountDataLoading != null) {
+      await accountDataLoading.timeout(const Duration(seconds: 3));
+    }
+  } catch (e, s) {
+    Logs().w('预加载数据库超时或失败，直接进界面', e, s);
+  }
 
-  await logAppStart();
-
+  // 先把界面画出来：app_start 需要读取包信息和机型（都是平台通道），
+  // 放在 runApp 之前会让弱网/异常直接把启动拖死。
   runApp(
     FluffyChatApp(
       clients: clients,
@@ -188,6 +266,14 @@ Future<void> startGui(List<Client> clients, SharedPreferences store) async {
       store: store,
     ),
   );
+  _bootSettled = true;
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(
+      logAppStart().catchError((Object error, StackTrace stack) {
+        Logs().w('[diag] app_start 记录失败', error, stack);
+      }),
+    );
+  });
 }
 
 /// Watches the lifecycle changes to start the application when it

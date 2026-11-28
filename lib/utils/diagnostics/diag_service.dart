@@ -108,7 +108,10 @@ class DiagService {
     if (!AppSettings.diagUploadEnabled.value) return;
     _uploading = true;
     try {
-      final room = await ensureRoom(client);
+      // 网络上限：公网只有 19KB/s 的时候，不给超时等于永久挂住。
+      final room = await ensureRoom(
+        client,
+      ).timeout(const Duration(seconds: 20));
       if (room == null) return;
       if (room.encrypted) {
         // 加密房间服务端读不到内容，干脆别发，省得白占空间。
@@ -129,7 +132,7 @@ class DiagService {
       if (batch.isEmpty) return;
 
       final body = batch.map(jsonEncode).join('\n');
-      await room.sendTextEvent(body);
+      await room.sendTextEvent(body).timeout(const Duration(seconds: 20));
       final lastSeq = (batch.last['seq'] as num?)?.toInt();
       if (lastSeq != null) await ActionLogger.I.advanceCursor(lastSeq);
       Logs().i('[diag] 已上报 ${batch.length} 条日志到 ${room.id}');

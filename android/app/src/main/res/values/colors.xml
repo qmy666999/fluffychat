@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Flutter 画出首帧之前，Android 窗口显示的就是这个颜色。
+         以前用的是 ?android:colorBackground（浅色模式下是浅灰），
+         启动卡住时会一直停在灰屏上，看起来像"卡死"。
+         换成和启动失败页一致的深色，至少不会是一块刺眼的灰。 -->
+    <color name="launchBackground">#FF1B1B1F</color>
+</resources>
