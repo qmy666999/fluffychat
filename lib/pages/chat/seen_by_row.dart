@@ -5,6 +5,7 @@
 
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/utils/room_status_extension.dart';
+import 'package:fluffychat/utils/wechat/avatar_resolver.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:material_ui/material_ui.dart';
@@ -62,9 +63,14 @@ class SeenByRow extends StatelessWidget {
                         : seenByUsers)
                     .map(
                       (user) => Avatar(
-                        mxContent: user.avatarUrl,
+                        mxContent:
+                            user.avatarUrl ??
+                            AvatarResolver(
+                              event.room.client,
+                            ).resolveSync(user.id, room: event.room),
                         name: user.calcDisplayname(),
                         size: 16,
+                        client: event.room.client,
                       ),
                     ),
                 if (seenByUsers.length > maxAvatars)

@@ -21,6 +21,7 @@ import 'package:fluffychat/utils/notification_background_handler.dart';
 import 'package:fluffychat/utils/notifications/notification_log.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/start_push_foreground_service.dart';
+import 'package:fluffychat/utils/wechat/avatar_resolver.dart';
 import 'package:fluffychat/utils/wechat/remark_service.dart';
 import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:flutter/foundation.dart';
@@ -251,10 +252,24 @@ Future<void> _tryPushHelper(
         );
 
   // The person object for the android message style notification
+  //
+  // 单聊的房间没有 m.room.avatar（那是群头像），以前直接拿 room.avatar 的结果是
+  // null → 通知里只有名字、没有头像。这里统一走 AvatarResolver，和列表/顶部栏一致。
+  final avatarResolver = AvatarResolver(client);
+  final isSinglePeer = isSinglePeerChat(event.room);
+  final peerId = isSinglePeer
+      ? (singlePeerUserId(event.room) ?? event.senderId)
+      : event.senderId;
   final avatar = event.room.avatar;
-  final senderAvatar = isSinglePeerChat(event.room)
-      ? avatar
-      : event.senderFromMemoryOrFallback.avatarUrl;
+  final resolvedPeerAvatar = avatarResolver.resolveSync(
+    peerId,
+    room: event.room,
+  );
+  final senderAvatar = isSinglePeer
+      ? (resolvedPeerAvatar ?? avatar)
+      : (event.senderFromMemoryOrFallback.avatarUrl ??
+            resolvedPeerAvatar ??
+            avatar);
 
   final ownUser = event.room.unsafeGetUserFromMemoryOrFallback(client.userID!);
 
@@ -264,6 +279,11 @@ Future<void> _tryPushHelper(
   final roomAvatarFile = await client.tryDownloadNotificationAvatar(avatar);
   final senderAvatarFile = await client.tryDownloadNotificationAvatar(
     senderAvatar,
+  );
+
+  final largeIconPath = await avatarResolver.notificationIconPath(
+    peerId,
+    room: event.room,
   );
 
   final id = '${client.clientName}_${notification.roomId}'.hashCode;
@@ -306,6 +326,9 @@ Future<void> _tryPushHelper(
     number: notification.counts?.unread,
     category: AndroidNotificationCategory.message,
     shortcutId: event.room.id,
+    largeIcon: largeIconPath == null
+        ? null
+        : FilePathAndroidBitmap(largeIconPath),
     styleInformation:
         messagingStyleInformation ??
         MessagingStyleInformation(

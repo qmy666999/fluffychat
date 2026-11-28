@@ -161,14 +161,26 @@ class _ImageBubblePlaceholder extends StatelessWidget {
     final blurHashString =
         event.infoMap.tryGet<String>('xyz.amorgan.blurhash') ??
         'LEHV6nWB2yk8pyo0adR*.7kCMdnj';
+    // blurhash 只是骨架。公网下缩略图可能要五六秒，光有骨架看起来就是「白框」，
+    // 所以在中间叠一个小转圈，让用户知道是在加载而不是坏了。
     return SizedBox(
       width: width,
       height: height,
-      child: BlurHash(
-        blurhash: blurHashString,
-        width: width,
-        height: height,
-        fit: fit,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          BlurHash(
+            blurhash: blurHashString,
+            width: width,
+            height: height,
+            fit: fit,
+          ),
+          SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+          ),
+        ],
       ),
     );
   }

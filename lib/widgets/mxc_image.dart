@@ -135,16 +135,28 @@ class _MxcImageState extends State<MxcImage> {
   }
 
   int _loadAttempts = 0;
+  bool _failed = false;
+
+  /// 公网下缩略图可能要好几秒（实测 5.85s），但也不能无限等：
+  /// 没有超时的话，一次卡住的请求会让占位一直转下去，看起来就是「坏了」。
+  static const Duration _loadTimeout = Duration(seconds: 20);
+  static const int _maxAttempts = 5;
 
   Future<void> _tryLoad() async {
     if (_imageData != null) {
       return;
     }
     try {
-      await _load();
+      await _load().timeout(_loadTimeout);
+      if (!mounted) return;
+      if (_imageData == null) {
+        // 没抛异常但也没数据（例如服务端返回空 body），当成失败处理。
+        throw Exception('empty image data');
+      }
+      if (_failed) setState(() => _failed = false);
     } catch (error, stackTrace) {
       // 图片拿不到时以前只打一条 debug 日志，用户那边就是一片灰人形，没法排查。
-      // 这里写进诊断日志（设置 → 关于 → 查看诊断日志），失败三次后放弃。
+      // 这里写进诊断日志（设置 → 关于 → 查看诊断日志）。
       ActionLogger.I.log(
         'image_fail',
         extra: {
@@ -156,14 +168,24 @@ class _MxcImageState extends State<MxcImage> {
         },
         stack: DiagRouteObserver.stack,
       );
-      if (_loadAttempts >= 2 || !mounted) {
+      if (!mounted) return;
+      _loadAttempts++;
+      if (_loadAttempts >= _maxAttempts) {
         Logs().d('Unable to load image', error, stackTrace);
+        setState(() => _failed = true);
         return;
       }
-      _loadAttempts++;
-      await Future.delayed(widget.retryDuration);
+      // 指数退避：2s、4s、8s、16s。公网不稳的时候多试几次，而不是一次失败就永远灰着。
+      final delay = widget.retryDuration * (1 << (_loadAttempts - 1));
+      await Future.delayed(delay);
       if (mounted) await _tryLoad();
     }
+  }
+
+  void _retryManually() {
+    _loadAttempts = 0;
+    if (_failed) setState(() => _failed = false);
+    _tryLoad();
   }
 
   @override
@@ -199,11 +221,17 @@ class _MxcImageState extends State<MxcImage> {
     }
 
     final imageChild = data == null
-        ? _MxcImagePlaceholder(
-            width: widget.width,
-            height: widget.height,
-            placeholder: widget.placeholder,
-          )
+        ? (_failed
+              ? _MxcImageRetry(
+                  width: widget.width,
+                  height: widget.height,
+                  onRetry: _retryManually,
+                )
+              : _MxcImagePlaceholder(
+                  width: widget.width,
+                  height: widget.height,
+                  placeholder: widget.placeholder,
+                ))
         : (ungzippedLottieData != null
               ? Lottie.memory(
                   ungzippedLottieData,
@@ -229,14 +257,58 @@ class _MxcImageState extends State<MxcImage> {
         borderRadius: widget.borderRadius,
         child: imageChild,
       ),
-      secondChild: _MxcImagePlaceholder(
-        width: widget.width,
-        height: widget.height,
-        placeholder: widget.placeholder,
-      ),
+      secondChild: _failed
+          ? _MxcImageRetry(
+              width: widget.width,
+              height: widget.height,
+              onRetry: _retryManually,
+            )
+          : _MxcImagePlaceholder(
+              width: widget.width,
+              height: widget.height,
+              placeholder: widget.placeholder,
+            ),
       crossFadeState: hasData
           ? CrossFadeState.showFirst
           : CrossFadeState.showSecond,
+    );
+  }
+}
+
+/// 加载彻底失败时的占位：一个能点的刷新按钮。
+///
+/// 以前失败就永远停在灰人形/白框上，用户只能杀 App；现在点一下就能重试。
+class _MxcImageRetry extends StatelessWidget {
+  final double? width;
+  final double? height;
+  final VoidCallback onRetry;
+
+  const _MxcImageRetry({
+    required this.width,
+    required this.height,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final size = min(width ?? 48, height ?? 48);
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Material(
+        color: theme.colorScheme.surfaceContainer,
+        child: InkWell(
+          onTap: onRetry,
+          child: Center(
+            child: Icon(
+              Icons.refresh,
+              size: size < 48 ? size * 0.6 : 24,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

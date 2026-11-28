@@ -10,6 +10,7 @@ import 'package:fluffychat/utils/date_time_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 import 'package:fluffychat/utils/sync_status_localization.dart';
 import 'package:fluffychat/utils/verified_room_extension.dart';
+import 'package:fluffychat/utils/wechat/avatar_resolver.dart';
 import 'package:fluffychat/utils/wechat/remark_service.dart';
 import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:fluffychat/widgets/avatar.dart';
@@ -44,7 +45,14 @@ class ChatAppBarTitle extends StatelessWidget {
         remark ??
         peer?.calcDisplayname() ??
         room.getLocalizedDisplayname(MatrixLocals(L10n.of(context)));
-    final avatar = peer?.avatarUrl ?? room.avatar;
+    // 顶部栏头像也走统一解析：peer.avatarUrl 有时是 null（成员状态没同步全），
+    // 直接退到 room.avatar 时两人会话就没有房间头像，结果是永久灰人形。
+    final avatar =
+        peer?.avatarUrl ??
+        (peer == null
+            ? null
+            : AvatarResolver(room.client).resolveSync(peer.id, room: room)) ??
+        room.avatar;
     return InkWell(
       hoverColor: Colors.transparent,
       splashColor: Colors.transparent,
