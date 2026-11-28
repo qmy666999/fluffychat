@@ -49,6 +49,9 @@ Future<void> showMessageActionsMenu(
       event.messageType == MessageTypes.Emote;
   // 图片/文件/视频：能「保存」和「转发」，但不该出现「复制」。
   final hasAttachment = event.hasAttachment;
+  final isImage = event.messageType == MessageTypes.Image;
+  final isStickerable =
+      isImage || event.messageType == MessageTypes.Sticker;
 
   final actions = <_MessageAction>[
     // 正在上传的消息允许停下：否则慢速网络下只能干等
@@ -92,7 +95,7 @@ Future<void> showMessageActionsMenu(
     if (hasAttachment && !event.status.isSending)
       _MessageAction(
         icon: Icons.download_outlined,
-        label: l10n.save,
+        label: isImage ? l10n.saveImage : l10n.save,
         onTap: () => event.saveFile(context),
       ),
     if (event.messageType == MessageTypes.Audio && TranscriptionService.enabled)
@@ -101,7 +104,8 @@ Future<void> showMessageActionsMenu(
         label: l10n.transcribe,
         onTap: () => TranscriptionService.transcribe(event),
       ),
-    if (event.messageType == MessageTypes.Sticker)
+    // 普通图片也可以收藏成表情：用户发的「愤怒表情」常常就是一张 m.image。
+    if (isStickerable)
       _MessageAction(
         icon: Icons.add_reaction_outlined,
         label: l10n.addToStickers,

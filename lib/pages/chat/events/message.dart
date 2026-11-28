@@ -973,20 +973,12 @@ class BubbleBackground extends StatelessWidget {
   }
 }
 
-/// 长按会弹出宫格菜单的消息类型：文字类（含表情、通知）与语音。
+/// 长按弹宫格菜单，**所有**消息类型都走这里（微信的做法）。
 ///
-/// 图片、视频、文件等仍然走原来的多选（那里有「保存到手机」等动作）。
+/// 以前图片/视频/文件长按会直接进多选，结果图片专属的「保存图片」
+/// 「添加到表情」根本没地方放；现在多选从菜单里的「多选」进。
 bool _showsActionsMenu(Event event) {
-  if (event.type != EventTypes.Message) return false;
-  switch (event.messageType) {
-    case MessageTypes.Text:
-    case MessageTypes.Notice:
-    case MessageTypes.Emote:
-    case MessageTypes.Audio:
-      return true;
-    default:
-      return false;
-  }
+  return event.type == EventTypes.Message || event.type == EventTypes.Sticker;
 }
 
 class BubblePainter extends CustomPainter {

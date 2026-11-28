@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -112,15 +113,66 @@ class StickerUploader {
   }
 }
 
-/// 长按别人的表情气泡时调用的「添加到表情」。
+/// 长按别人的表情/图片气泡时调用的「添加到表情」。
+///
+/// 两条路径：
+/// * `m.sticker` 且房间没加密：直接引用原来的 mxc，不浪费一次上传（顺带天然去重）；
+/// * 其它情况（普通 `m.image`、加密房间）：下载原图 → 按表情规格压缩 → 重新上传。
+///   加密房间必须重传，因为原来的 mxc 没有 key，别的设备解不开。
 Future<void> addStickerFromEvent(BuildContext context, Event event) async {
   final l10n = L10n.of(context);
-  final item = StickerUploader.fromEvent(event);
-  if (item == null) {
-    AppToast.show(l10n.stickerUploadFailed, isError: true);
-    return;
+  final client = event.room.client;
+  final store = StickerStore(client);
+
+  final directUrl = event.content.tryGet<String>('url');
+  final canReference =
+      event.messageType == MessageTypes.Sticker &&
+      !event.room.encrypted &&
+      directUrl != null &&
+      directUrl.startsWith('mxc://');
+
+  if (canReference) {
+    final item = StickerUploader.fromEvent(event);
+    if (item != null) {
+      await _addSticker(context, store, item);
+      return;
+    }
   }
-  final result = await StickerStore(event.room.client).add(item);
+
+  try {
+    final file = await event
+        .downloadAndDecryptAttachment()
+        .timeout(const Duration(seconds: 30));
+    final name = file.name.isNotEmpty ? file.name : event.body;
+    final item = await StickerUploader.upload(
+      client,
+      file.bytes,
+      name: name.isEmpty ? 'sticker' : name,
+      mimetype: file.mimeType,
+    );
+    if (!context.mounted) return;
+    await _addSticker(context, store, item);
+  } on StickerImageException catch (e) {
+    if (!context.mounted) return;
+    AppToast.show(_stickerImageError(l10n, e), isError: true);
+  } on TimeoutException catch (e) {
+    debugPrint('[sticker] 下载超时: $e');
+    if (!context.mounted) return;
+    AppToast.show(l10n.stickerUploadFailed, isError: true);
+  } catch (e, s) {
+    Logs().w('[sticker] 从消息添加表情失败', e, s);
+    if (!context.mounted) return;
+    AppToast.show(l10n.stickerUploadFailed, isError: true);
+  }
+}
+
+Future<void> _addSticker(
+  BuildContext context,
+  StickerStore store,
+  StickerItem item,
+) async {
+  final l10n = L10n.of(context);
+  final result = await store.add(item);
   switch (result) {
     case StickerAddResult.added:
       StickerStore.revision.value++;
@@ -130,4 +182,13 @@ Future<void> addStickerFromEvent(BuildContext context, Event event) async {
     case StickerAddResult.failed:
       AppToast.show(l10n.stickerUploadFailed, isError: true);
   }
+}
+
+String _stickerImageError(L10n l10n, StickerImageException e) {
+  return switch (e.error) {
+    StickerImageError.animatedTooLarge => l10n.stickerAnimatedTooLarge,
+    StickerImageError.animatedTooBig => l10n.stickerAnimatedTooBigDims,
+    StickerImageError.unsupported => l10n.stickerUnsupportedImage,
+    StickerImageError.decodeFailed => l10n.stickerUnsupportedImage,
+  };
 }

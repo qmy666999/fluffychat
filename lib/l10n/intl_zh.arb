@@ -3419,5 +3419,6 @@
   "viewDiagnosticsHint": "只包含操作类型，不含聊天内容",
   "viewDiagnosticsFailed": "打不开诊断日志",
   "updateInstallNoPermission": "没弹出安装界面，请到「设置 → 应用 → 安装未知应用」里允许后重试",
-  "updateInstallFileMissing": "安装包不见了，请重新下载"
+  "updateInstallFileMissing": "安装包不见了，请重新下载",
+  "saveImage": "保存图片"
 }
