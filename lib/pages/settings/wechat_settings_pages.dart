@@ -8,6 +8,7 @@ import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/app_settings_launcher.dart';
 import 'package:fluffychat/utils/diagnostics/action_logger.dart';
 import 'package:fluffychat/utils/diagnostics/diag_exporter.dart';
+import 'package:fluffychat/utils/diagnostics/diag_service.dart';
 import 'package:fluffychat/utils/notifications/app_notifications.dart';
 import 'package:fluffychat/utils/notifications/notification_log.dart';
 import 'package:fluffychat/utils/updates/app_update_service.dart';
@@ -500,6 +501,13 @@ class SettingsAboutPage extends StatelessWidget {
             trailing: Text(snapshot.data ?? ''),
           ),
         ),
+        ListTile(
+          leading: const Icon(Icons.receipt_long_outlined),
+          title: Text(l10n.viewDiagnostics),
+          subtitle: Text(l10n.viewDiagnosticsHint),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _openDiagnostics(context),
+        ),
         const UpdateCheckTile(),
         const ServerEndpointTile(),
         ListTile(
@@ -780,4 +788,23 @@ class _WechatSettingsScaffold extends StatelessWidget {
 
 void _showComingSoon(BuildContext context) {
   AppToast.show(L10n.of(context).featureComingSoon);
+}
+
+/// 打开诊断日志房间（不存在就先建）。房间在会话列表里被隐藏，
+/// 这里给一个明确入口，方便用户自己确认「到底上传了什么」。
+Future<void> _openDiagnostics(BuildContext context) async {
+  final l10n = L10n.of(context);
+  final client = Matrix.of(context).client;
+  final roomId = DiagService.roomIdOf(client);
+  if (roomId != null && client.getRoomById(roomId) != null) {
+    context.go('/rooms/$roomId');
+    return;
+  }
+  final room = await DiagService.I.ensureRoom(client);
+  if (!context.mounted) return;
+  if (room == null) {
+    AppToast.show(l10n.viewDiagnosticsFailed, isError: true);
+    return;
+  }
+  context.go('/rooms/${room.id}');
 }

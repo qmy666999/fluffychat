@@ -7,19 +7,26 @@ import 'dart:convert';
 
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/utils/diagnostics/action_logger.dart';
+import 'package:fluffychat/utils/wechat/hidden_rooms_service.dart';
 import 'package:matrix/matrix.dart';
 
 /// 把本地操作日志上报到一个**自己的私有房间**，方便出 bug 时直接拉取，
 /// 不需要用户做任何操作（也不用 adb）。
 ///
-/// 房间：名字 `__diag__`、私有（invite only）、**不加密**（加密了服务端 API
+/// 房间：名字「诊断日志」、私有（invite only）、**不加密**（加密了服务端 API
 /// 读不到内容），房间 ID 存在账号数据 [roomMarkerKey] 里。
+///
+/// 这个房间**不进聊天列表**：会写进 `com.dafeiyu.hidden_rooms`，
+/// 列表渲染时再按房间 ID 过滤一次兜底；同时设为静音、日志用 m.notice。
 class DiagService {
   DiagService._();
 
   static final DiagService I = DiagService._();
 
-  static const String roomName = '__diag__';
+  static const String roomName = '诊断日志';
+
+  /// 早期版本用的房间名，找到老房间时要顺手改名。
+  static const String legacyRoomName = '__diag__';
 
   static const String roomMarkerKey = 'com.dafeiyu.diag_room';
 
@@ -35,6 +42,39 @@ class DiagService {
   bool _uploading = false;
 
   Client? get client => _client;
+
+  /// 诊断房间 ID（存在账号数据里）。聊天列表用它过滤，设置页用它开房间。
+  static String? roomIdOf(Client client) {
+    final value = client.accountData[roomMarkerKey]?.content['room_id'];
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
+  /// 把房间设成「不在列表里、不打扰」的形态；已设过也不会重复写。
+  Future<void> _configure(Room room) async {
+    final client = room.client;
+    if (room.name != roomName) {
+      try {
+        await room.setName(roomName);
+      } catch (e, s) {
+        Logs().w('[diag] 改房间名失败', e, s);
+      }
+    }
+    if (room.pushRuleState != PushRuleState.dontNotify) {
+      try {
+        await room.setPushRuleState(PushRuleState.dontNotify);
+      } catch (e, s) {
+        Logs().w('[diag] 设置静音失败', e, s);
+      }
+    }
+    try {
+      final hidden = HiddenRoomsService(client);
+      if (!hidden.load().contains(room.id)) {
+        await hidden.hide(room.id);
+      }
+    } catch (e, s) {
+      Logs().w('[diag] 隐藏诊断房间失败', e, s);
+    }
+  }
 
   void start(Client client) {
     _client = client;
@@ -59,6 +99,7 @@ class DiagService {
     if (marker is String && marker.isNotEmpty) {
       final existing = client.getRoomById(marker);
       if (existing != null && existing.membership == Membership.join) {
+        await _configure(existing);
         return existing;
       }
       try {
@@ -68,6 +109,7 @@ class DiagService {
       }
       final joined = client.getRoomById(marker);
       if (joined != null && joined.membership == Membership.join) {
+        await _configure(joined);
         return joined;
       }
     }
@@ -89,13 +131,17 @@ class DiagService {
     final room = client.getRoomById(roomId);
     if (room != null) {
       Logs().i('[diag] 已创建诊断房间 $roomId');
+      await _configure(room);
       return room;
     }
     // 新房间可能还没进 sync，等一下再试。
     for (var i = 0; i < 10; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 500));
       final retry = client.getRoomById(roomId);
-      if (retry != null) return retry;
+      if (retry != null) {
+        await _configure(retry);
+        return retry;
+      }
     }
     return null;
   }
@@ -132,7 +178,13 @@ class DiagService {
       if (batch.isEmpty) return;
 
       final body = batch.map(jsonEncode).join('\n');
-      await room.sendTextEvent(body).timeout(const Duration(seconds: 20));
+      // m.notice：语义是系统提示，不进未读、不弹窗。
+      await room
+          .sendEvent({
+            'msgtype': 'm.notice',
+            'body': body,
+          }, type: EventTypes.Message)
+          .timeout(const Duration(seconds: 20));
       final lastSeq = (batch.last['seq'] as num?)?.toInt();
       if (lastSeq != null) await ActionLogger.I.advanceCursor(lastSeq);
       Logs().i('[diag] 已上报 ${batch.length} 条日志到 ${room.id}');

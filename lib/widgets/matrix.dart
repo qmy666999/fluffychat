@@ -625,12 +625,14 @@ class MatrixState extends State<Matrix> {
     if (!mounted) return;
 
     var unreadRooms = 0;
+    final diagRoomId = DiagService.roomIdOf(client);
     for (final room in client.rooms) {
       final lastEvent = room.lastEvent;
       if (lastEvent == null) continue;
       if (lastEvent.senderId == client.userID) continue;
       if (room.notificationCount <= 0) continue;
       if (room.membership != Membership.join) continue;
+      if (room.id == diagRoomId) continue;
       unreadRooms++;
       await _pushRoomNotification(
         client,
@@ -673,6 +675,11 @@ class MatrixState extends State<Matrix> {
     final room = event.room;
     if (room.membership != Membership.join) {
       NotificationLog.add('跳过：不在该房间（${room.membership}）');
+      return;
+    }
+    // 诊断日志房间是后台自动上报用的，绝不弹通知。
+    if (room.id == DiagService.roomIdOf(client)) {
+      NotificationLog.add('跳过：诊断日志房间');
       return;
     }
     if (event.type != EventTypes.Message &&

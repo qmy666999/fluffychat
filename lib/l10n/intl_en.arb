@@ -3414,5 +3414,8 @@
         "type": "String"
       }
     }
-  }
+  },
+  "viewDiagnostics": "View diagnostics",
+  "viewDiagnosticsHint": "Only operation types, never chat content",
+  "viewDiagnosticsFailed": "Cannot open diagnostics"
 }

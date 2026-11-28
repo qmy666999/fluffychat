@@ -13,6 +13,7 @@ import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat_list/chat_list_view.dart';
+import 'package:fluffychat/utils/diagnostics/diag_service.dart';
 import 'package:fluffychat/utils/error_reporter.dart';
 import 'package:fluffychat/utils/friends/friends_service.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
@@ -177,10 +178,13 @@ class ChatListController extends State<ChatList>
     final moments = MomentsService(client);
     // 删掉的好友对应的私聊房间：房间还在（没退群，历史都在），只是不列出来。
     final hiddenRooms = HiddenRoomsService(client).load();
+    // 诊断日志房间永远不进会话列表（就算 hidden_rooms 还没写成功也不显示）。
+    final diagRoomId = DiagService.roomIdOf(client);
     return client.rooms
         .where(getRoomFilterByActiveFilter(activeFilter))
         .where((room) => room.membership == Membership.join)
         .where((room) => !hiddenRooms.contains(room.id))
+        .where((room) => room.id != diagRoomId)
         .where((room) => !moments.hidesRoom(room))
         .toList();
   }

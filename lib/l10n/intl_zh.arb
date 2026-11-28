@@ -3414,5 +3414,8 @@
         "type": "String"
       }
     }
-  }
+  },
+  "viewDiagnostics": "查看诊断日志",
+  "viewDiagnosticsHint": "只包含操作类型，不含聊天内容",
+  "viewDiagnosticsFailed": "打不开诊断日志"
 }
