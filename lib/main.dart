@@ -137,8 +137,21 @@ Future<void> _boot(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 首帧没出来之前，任何 widget 构建异常都要能看见文字，不能是纯灰块。
-  ErrorWidget.builder = (details) =>
-      StartupErrorPanel(message: details.exceptionAsString());
+  ErrorWidget.builder = (details) {
+    // 只显示异常文字时，`Null check operator used on a null value` 这类
+    // 消息没有任何位置信息，等于没法定位。这里把堆栈前 12 帧一起画出来，
+    // 同时打到 logcat，用户截个图就够了。
+    final stackLines = (details.stack?.toString() ?? '')
+        .split('\n')
+        .where((line) => line.trim().isNotEmpty)
+        .take(12)
+        .join('\n');
+    debugPrint('[ui-error] ${details.exceptionAsString()}\n$stackLines');
+    return StartupErrorPanel(
+      message: details.exceptionAsString(),
+      stack: stackLines,
+    );
+  };
 
   // 启动看门狗：卡在 await 上超过 12 秒也强制给出一张错误页。
   Timer(_startupWatchdogTimeout, () {

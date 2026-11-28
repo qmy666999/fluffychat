@@ -66,13 +66,26 @@ class StartupFailureApp extends StatelessWidget {
 }
 
 /// 替换默认的 `ErrorWidget`：release 包里默认是纯灰/纯红方块，什么都读不到。
+///
+/// 光有异常文字往往不够——`Null check operator used on a null value` 这类
+/// 消息没有位置信息，必须把堆栈前几帧一起显示出来才能定位。
 class StartupErrorPanel extends StatelessWidget {
-  const StartupErrorPanel({super.key, required this.message});
+  const StartupErrorPanel({super.key, required this.message, this.stack});
 
   final String message;
 
+  /// 堆栈的前若干帧（由调用方裁剪好）。
+  final String? stack;
+
   @override
   Widget build(BuildContext context) {
+    final stack = this.stack?.trim();
+    final text = StringBuffer('界面出错了\n\n$message');
+    if (stack != null && stack.isNotEmpty) {
+      text
+        ..write('\n\n')
+        ..write(stack);
+    }
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Container(
@@ -80,8 +93,8 @@ class StartupErrorPanel extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         alignment: Alignment.center,
         child: SingleChildScrollView(
-          child: Text(
-            '界面出错了\n\n$message',
+          child: SelectableText(
+            text.toString(),
             style: const TextStyle(
               color: Color(0xFFFFB4AB),
               fontSize: 13,

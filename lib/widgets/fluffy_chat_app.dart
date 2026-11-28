@@ -12,7 +12,6 @@ import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat/active_call_banner.dart';
-import 'package:fluffychat/utils/diagnostics/action_logger.dart';
 import 'package:fluffychat/utils/diagnostics/diag_route_observer.dart';
 import 'package:fluffychat/widgets/app_lock.dart';
 import 'package:fluffychat/widgets/layouts/call_overlay.dart';
@@ -118,29 +117,26 @@ class FluffyChatApp extends StatelessWidget {
         ],
         supportedLocales: L10n.supportedLocales,
         routerConfig: router,
-        builder: (context, child) => BackButtonListener(
-          // 系统返回手势：先把当时的完整路由栈记下来，再走正常返回逻辑。
-          // 这条日志是「返回把不该关的页面关掉了」这类 bug 的唯一证据。
-          onBackButtonPressed: () {
-            ActionLogger.I.log('back_gesture', stack: DiagRouteObserver.stack);
-            return FluffyChatApp.router.routerDelegate.popRoute();
-          },
-          child: AppLockWidget(
-            pincode: appLockSettings.pincode,
-            useBiometrics: appLockSettings.useBiometrics,
-            isLoggedIn: clients.any((client) => client.isLogged()),
-            // 全局通话横幅：挂在 Navigator 外面，所以切到通讯录、发现、我
-            // 这些页面时横幅也一直在。放在 AppLockWidget 里面，锁屏时它会被
-            // 锁屏界面盖住，不会泄露通话状态。
-            child: GlobalCallBannerHost(
-              // Need a navigator above the Matrix widget for
-              // displaying dialogs
-              child: Matrix(
-                clients: clients,
-                store: store,
-                child: CallOverlay(
-                  child: testWidget ?? child ?? const SizedBox.shrink(),
-                ),
+        // 注意：`MaterialApp.router` 的 builder 在 Router **外面**（WidgetsApp
+        // 是先用 builder 包住整个 routing，再挂到 MaterialApp 上的），这里
+        // 一旦放 `BackButtonListener` 之类要找 `Router` 祖先的组件，release
+        // 包里就是一句 `Null check operator used on a null value`，整个界面
+        // 变成错误页。所以返回手势的日志改由 [DiagRouteObserver.didPop] 记。
+        builder: (context, child) => AppLockWidget(
+          pincode: appLockSettings.pincode,
+          useBiometrics: appLockSettings.useBiometrics,
+          isLoggedIn: clients.any((client) => client.isLogged()),
+          // 全局通话横幅：挂在 Navigator 外面，所以切到通讯录、发现、我
+          // 这些页面时横幅也一直在。放在 AppLockWidget 里面，锁屏时它会被
+          // 锁屏界面盖住，不会泄露通话状态。
+          child: GlobalCallBannerHost(
+            // Need a navigator above the Matrix widget for
+            // displaying dialogs
+            child: Matrix(
+              clients: clients,
+              store: store,
+              child: CallOverlay(
+                child: testWidget ?? child ?? const SizedBox.shrink(),
               ),
             ),
           ),

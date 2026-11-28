@@ -37,7 +37,17 @@ class DiagRouteObserver extends NavigatorObserver {
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     final popped = _nameOf(route);
-    _stack.remove(popped);
+    // 返回手势的日志就记在这里：`MaterialApp.router` 的 builder 在 Router
+    // 外面，放 `BackButtonListener` 会直接 crash（Router.of 拿不到祖先）。
+    // 每一次返回最终都会走到 pop，所以这里记下的栈就是「返回前那一刻」的栈。
+    final before = stack;
+    ActionLogger.I.log(
+      'back_gesture',
+      route: popped,
+      extra: {'popped': popped},
+      stack: before,
+    );
+    _removeLast(popped);
     ActionLogger.I.log('nav_pop', extra: {'popped': popped}, stack: stack);
     super.didPop(route, previousRoute);
   }
@@ -45,9 +55,16 @@ class DiagRouteObserver extends NavigatorObserver {
   @override
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
     final removed = _nameOf(route);
-    _stack.remove(removed);
+    _removeLast(removed);
     ActionLogger.I.log('nav_remove', extra: {'removed': removed}, stack: stack);
     super.didRemove(route, previousRoute);
+  }
+
+  /// 同名路由（比如两次打开同一个房间）必须移除**最上面**那一条，
+  /// 否则栈里会剩下一个已经关掉的条目，越记越乱。
+  static void _removeLast(String name) {
+    final index = _stack.lastIndexOf(name);
+    if (index != -1) _stack.removeAt(index);
   }
 
   @override
