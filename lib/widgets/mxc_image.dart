@@ -4,13 +4,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/utils/client_download_content_extension.dart';
+import 'package:fluffychat/utils/diagnostics/action_logger.dart';
+import 'package:fluffychat/utils/diagnostics/diag_route_observer.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_file_extension.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:lottie/lottie.dart';
@@ -133,18 +134,35 @@ class _MxcImageState extends State<MxcImage> {
     }
   }
 
+  int _loadAttempts = 0;
+
   Future<void> _tryLoad() async {
     if (_imageData != null) {
       return;
     }
     try {
       await _load();
-    } on IOException catch (_) {
-      if (!mounted) return;
+    } catch (error, stackTrace) {
+      // 图片拿不到时以前只打一条 debug 日志，用户那边就是一片灰人形，没法排查。
+      // 这里写进诊断日志（设置 → 关于 → 查看诊断日志），失败三次后放弃。
+      ActionLogger.I.log(
+        'image_fail',
+        extra: {
+          'uri': widget.uri?.toString() ?? '',
+          'width': widget.width ?? 0,
+          'height': widget.height ?? 0,
+          'attempt': _loadAttempts + 1,
+          'error': '$error',
+        },
+        stack: DiagRouteObserver.stack,
+      );
+      if (_loadAttempts >= 2 || !mounted) {
+        Logs().d('Unable to load image', error, stackTrace);
+        return;
+      }
+      _loadAttempts++;
       await Future.delayed(widget.retryDuration);
-      _tryLoad();
-    } on MatrixException catch (e) {
-      Logs().d('Unable to load image', e);
+      if (mounted) await _tryLoad();
     }
   }
 

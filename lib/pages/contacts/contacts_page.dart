@@ -46,6 +46,12 @@ class _ContactsPageState extends State<ContactsPage> {
     FriendsSync.start(client);
     // 进页面就重扫一次：对方刚同意、或者换设备登录时，名单要能立刻出来。
     unawaited(FriendsSync.scanNow(client));
+    // 顺手给没有头像的好友补一次资料（老记录可能只存了名字）。
+    unawaited(
+      FriendsService(client).refreshMissingAvatars().then((_) {
+        if (mounted) setState(() {});
+      }),
+    );
   }
 
   @override
@@ -254,6 +260,7 @@ class _ContactsPageState extends State<ContactsPage> {
                           ListTile(
                             key: ValueKey(friend.userId),
                             leading: Avatar(
+                              client: client,
                               mxContent: _parseUri(friend.avatarUrl),
                               name:
                                   RemarkService(

@@ -266,6 +266,40 @@ class FriendsService {
 
   Future<void> save(FriendsData data) => _save(data);
 
+  /// 给没有头像的好友补一次资料（account data 里 avatar_url 为空时兜底）。
+  ///
+  /// 通讯录只读 `com.dafeiyu.friends`，一旦某条记录的 avatar_url 是空的
+  /// （老版本写入、或对方后来才上传头像），界面上就永远是灰人形。
+  /// 这里拉一次 profile，把 avatar_url / display_name 补回 account data。
+  Future<void> refreshMissingAvatars() async {
+    final data = load();
+    final missing = data.friends
+        .where((friend) => (friend.avatarUrl ?? '').trim().isEmpty)
+        .map((friend) => friend.userId)
+        .toList();
+    if (missing.isEmpty) return;
+    var changed = false;
+    for (final userId in missing) {
+      try {
+        final profile = await client.getProfileFromUserId(
+          userId,
+          timeout: const Duration(seconds: 10),
+        );
+        final avatarUrl = profile.avatarUrl?.toString() ?? '';
+        if (avatarUrl.isEmpty) continue;
+        final index = data.friends.indexWhere((f) => f.userId == userId);
+        if (index < 0) continue;
+        data.friends[index].avatarUrl = avatarUrl;
+        data.friends[index].displayName =
+            profile.displayName ?? data.friends[index].displayName;
+        changed = true;
+      } catch (error, stackTrace) {
+        Logs().w('[friends] 拉取资料失败 $userId', error, stackTrace);
+      }
+    }
+    if (changed) await _save(data);
+  }
+
   // ---------------------------------------------------------------- 好友维护
 
   Future<void> addFriend(FriendEntry friend) async {
