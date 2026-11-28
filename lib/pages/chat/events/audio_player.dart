@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:fluffychat/utils/error_reporter.dart';
 import 'package:fluffychat/utils/file_description.dart';
@@ -269,6 +270,9 @@ class AudioPlayerState extends State<AudioPlayerWidget>
     });
   }
 
+  /// 已经播放过（有进度或播完），气泡里的波形/时长要变浅。
+  bool _played = false;
+
   /// 微信的语音气泡宽度随时长变化：1 秒约 80px，60 秒约 200px。
   double _bubbleWidth(int seconds) {
     final s = seconds.clamp(1, 60);
@@ -293,6 +297,14 @@ class AudioPlayerState extends State<AudioPlayerWidget>
 
         _syncPulse(playing);
 
+        if (audioPlayer != null && audioPlayer.position > Duration.zero) {
+          _played = true;
+        }
+        final faded = _played && !playing;
+        final barColor = faded
+            ? widget.color.withValues(alpha: 0.5)
+            : widget.color;
+
         final seconds = _durationSeconds(audioPlayer) ?? 5;
         final width = _bubbleWidth(seconds);
 
@@ -306,24 +318,16 @@ class AudioPlayerState extends State<AudioPlayerWidget>
                   value: _downloadProgress,
                 ),
               )
-            : ScaleTransition(
-                scale: Tween<double>(begin: 1, end: 1.18).animate(
-                  CurvedAnimation(
-                    parent: _pulseController,
-                    curve: Curves.easeInOut,
-                  ),
-                ),
-                child: Icon(
-                  playing ? Icons.graphic_eq : Icons.volume_up,
-                  size: 18,
-                  color: widget.color,
-                ),
+            : VoiceBars(
+                animation: _pulseController,
+                playing: playing,
+                color: barColor,
               );
 
         final durationLabel = Text(
           '$seconds"',
           style: TextStyle(
-            color: widget.color,
+            color: barColor,
             fontSize: 14,
             fontWeight: FontWeight.w500,
           ),
@@ -383,6 +387,72 @@ class AudioPlayerState extends State<AudioPlayerWidget>
           ],
         );
       },
+    );
+  }
+}
+
+/// 微信式语音波形：三条竖线，只有正在播放时才跳。
+///
+/// 播放时用 [_animation] 驱动高度，暂停时回到固定的静止高度，
+/// 这样“点一下就停”不会有残留动画。
+class VoiceBars extends StatelessWidget {
+  const VoiceBars({
+    super.key,
+    required this.animation,
+    required this.playing,
+    required this.color,
+    this.barWidth = 3,
+    this.gap = 2,
+    this.maxHeight = 18,
+  });
+
+  final Animation<double> animation;
+  final bool playing;
+  final Color color;
+  final double barWidth;
+  final double gap;
+  final double maxHeight;
+
+  /// 暂停时的静止形状（中间那根高一点，像微信）。
+  static const List<double> idleHeights = <double>[8, 16, 11];
+
+  double _animatedHeight(double t, int index) {
+    final phase = (t + index * 0.28) % 1.0;
+    final wave = math.sin(phase * math.pi * 2).abs();
+    return 6 + wave * (maxHeight - 6);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: barWidth * idleHeights.length + gap * (idleHeights.length - 1),
+      height: maxHeight,
+      child: AnimatedBuilder(
+        animation: animation,
+        builder: (context, _) {
+          final t = playing ? animation.value : 0.0;
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              for (var i = 0; i < idleHeights.length; i++)
+                Padding(
+                  padding: EdgeInsets.only(
+                    right: i == idleHeights.length - 1 ? 0 : gap,
+                  ),
+                  child: Container(
+                    width: barWidth,
+                    height: playing ? _animatedHeight(t, i) : idleHeights[i],
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(barWidth / 2),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
