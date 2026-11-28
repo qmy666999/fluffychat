@@ -5,6 +5,7 @@
 
 import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/utils/wechat/remark_service.dart';
 import 'package:fluffychat/widgets/member_actions_popup_menu_button.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -55,7 +56,9 @@ class ParticipantListItem extends StatelessWidget {
             ),
           Expanded(
             child: Text(
-              user.calcDisplayname(),
+              // 群成员列表也要用备注名，跟聊天列表、消息气泡保持一致。
+              RemarkService(user.room.client).remarkOf(user.id) ??
+                  user.calcDisplayname(),
               overflow: TextOverflow.ellipsis,
             ),
           ),

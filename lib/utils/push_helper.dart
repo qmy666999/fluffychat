@@ -21,6 +21,7 @@ import 'package:fluffychat/utils/notification_background_handler.dart';
 import 'package:fluffychat/utils/notifications/notification_log.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/start_push_foreground_service.dart';
+import 'package:fluffychat/utils/wechat/remark_service.dart';
 import 'package:fluffychat/utils/wechat/room_kind.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
@@ -267,7 +268,11 @@ Future<void> _tryPushHelper(
 
   final id = '${client.clientName}_${notification.roomId}'.hashCode;
 
-  final senderName = event.senderFromMemoryOrFallback.calcDisplayname();
+  // 标题/发送者名字要跟聊天列表一致：备注优先（否则给好友起了备注，
+  // 通知里还是显示对方的原始昵称）。
+  final senderName =
+      RemarkService(client).remarkOf(event.senderId) ??
+      event.senderFromMemoryOrFallback.calcDisplayname();
   // Show notification
 
   final newMessage = Message(

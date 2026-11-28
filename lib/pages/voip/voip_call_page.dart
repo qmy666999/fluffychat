@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/voip/loading_dots.dart';
 import 'package:fluffychat/utils/voip/matrix_voip.dart';
+import 'package:fluffychat/utils/wechat/remark_service.dart';
 import 'package:fluffychat/widgets/app_toast.dart';
 import 'package:fluffychat/widgets/avatar.dart';
 import 'package:flutter/material.dart';
@@ -152,7 +153,12 @@ class _VoipCallPageState extends State<VoipCallPage> {
     final room = call?.room;
     if (room == null) return '';
     final peer = _peerOf(room);
-    return peer?.calcDisplayname() ?? room.getLocalizedDisplayname();
+    // 备注优先，跟聊天列表保持一致（否则给好友起了备注，通话页还是原名）。
+    final peerId = peer?.id ?? room.directChatMatrixID;
+    final remark = peerId == null
+        ? null
+        : RemarkService(room.client).remarkOf(peerId);
+    return remark ?? peer?.calcDisplayname() ?? room.getLocalizedDisplayname();
   }
 
   bool _isIncoming(CallSession? call) =>

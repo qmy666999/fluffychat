@@ -5,6 +5,7 @@
 
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
+import 'package:fluffychat/utils/wechat/remark_service.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
@@ -67,7 +68,7 @@ class ReplyContent extends StatelessWidget {
                   future: displayEvent.fetchSenderUser(),
                   builder: (context, snapshot) {
                     return Text(
-                      '${snapshot.data?.calcDisplayname() ?? displayEvent.senderFromMemoryOrFallback.calcDisplayname()}:',
+                      '${RemarkService(displayEvent.room.client).remarkOf(displayEvent.senderId) ?? snapshot.data?.calcDisplayname() ?? displayEvent.senderFromMemoryOrFallback.calcDisplayname()}:',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

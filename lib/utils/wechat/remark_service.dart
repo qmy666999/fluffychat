@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/utils/friends/friends_service.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -32,16 +33,32 @@ class RemarkService {
   const RemarkService(this.client);
 
   Map<String, String> load() {
-    final content = client.accountData[eventType]?.content;
-    if (content == null) return const {};
     final result = <String, String>{};
-    for (final entry in content.entries) {
-      final key = entry.key;
-      final value = entry.value;
-      if (!key.startsWith('@') || value is! String) continue;
-      final trimmed = value.trim();
-      if (trimmed.isEmpty) continue;
-      result[key] = trimmed;
+    // 兼容老数据：1.18 之前加好友时备注写在 `com.dafeiyu.friends`
+    // 的 friends[].remark 里，读的时候两边都查（独立 key 优先）。
+    final friendsRaw =
+        client.accountData[FriendsService.friendsEventType]?.content['friends'];
+    if (friendsRaw is List) {
+      for (final item in friendsRaw) {
+        if (item is! Map) continue;
+        final userId = item['user_id'];
+        final remark = item['remark'];
+        if (userId is! String || remark is! String) continue;
+        final trimmed = remark.trim();
+        if (trimmed.isEmpty) continue;
+        result[userId] = trimmed;
+      }
+    }
+    final content = client.accountData[eventType]?.content;
+    if (content != null) {
+      for (final entry in content.entries) {
+        final key = entry.key;
+        final value = entry.value;
+        if (!key.startsWith('@') || value is! String) continue;
+        final trimmed = value.trim();
+        if (trimmed.isEmpty) continue;
+        result[key] = trimmed;
+      }
     }
     return result;
   }
@@ -73,6 +90,16 @@ class RemarkService {
     final me = client.userID;
     if (me != null) {
       await client.setAccountData(me, eventType, content);
+    }
+    // 两套存储保持一致：加好友时会写 friends[].remark（老数据），
+    // 这里顺手也写一份，免得通讯录和聊天列表各读一份对不上。
+    try {
+      final synced = content[userId];
+      await FriendsService(
+        client,
+      ).setRemark(userId, synced is String ? synced : '');
+    } catch (error, stackTrace) {
+      Logs().w('[remark] 同步到好友列表失败', error, stackTrace);
     }
   }
 

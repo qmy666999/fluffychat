@@ -10,6 +10,7 @@ import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 import 'package:fluffychat/utils/notification_background_handler.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/push_helper.dart';
+import 'package:fluffychat/utils/wechat/remark_service.dart';
 import 'package:fluffychat/widgets/fluffy_chat_app.dart';
 import 'package:fluffychat/widgets/incoming_call_dialog.dart';
 import 'package:fluffychat/widgets/matrix.dart';
@@ -54,9 +55,12 @@ extension LocalNotificationsExtension on MatrixState {
       }
     }
 
-    final title = event.room.getLocalizedDisplayname(
-      MatrixLocals(L10n.of(context)),
-    );
+    final directChat = event.room.isDirectChat;
+    // 单聊的标题就是对方的名字：备注优先，跟聊天列表保持一致。
+    final title = directChat
+        ? RemarkService(event.room.client).remarkOf(event.senderId) ??
+              event.room.getLocalizedDisplayname(MatrixLocals(L10n.of(context)))
+        : event.room.getLocalizedDisplayname(MatrixLocals(L10n.of(context)));
     var body = event.calcLocalizedBody(
       MatrixLocals(L10n.of(context)),
       plaintextBody: true,
@@ -64,10 +68,14 @@ extension LocalNotificationsExtension on MatrixState {
       hideEdit: true,
       removeMarkdown: true,
     );
-    if (!event.room.isDirectChat) {
+    if (!directChat) {
       final sender =
           await event.fetchSenderUser() ?? event.senderFromMemoryOrFallback;
-      body = l10n.senderMessage(sender.calcDisplayname(), body);
+      // 群聊正文里的发送者也要用备注名。
+      final senderName =
+          RemarkService(event.room.client).remarkOf(event.senderId) ??
+          sender.calcDisplayname();
+      body = l10n.senderMessage(senderName, body);
     }
     final avatarUrl = event.room.avatar;
 
