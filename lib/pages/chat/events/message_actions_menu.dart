@@ -8,11 +8,15 @@ import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/config/m3_motion.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/favorites/favorites_service.dart';
+import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
+import 'package:fluffychat/utils/show_scaffold_dialog.dart';
 import 'package:fluffychat/utils/stickers/sticker_service.dart';
 import 'package:fluffychat/utils/wechat/message_retry.dart';
 import 'package:fluffychat/utils/wechat/reminder_service.dart';
+import 'package:fluffychat/utils/wechat/speech_service.dart';
 import 'package:fluffychat/widgets/animations/message_shatter.dart';
 import 'package:fluffychat/widgets/app_toast.dart';
+import 'package:fluffychat/widgets/share_scaffold_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -42,6 +46,8 @@ Future<void> showMessageActionsMenu(
       event.messageType == MessageTypes.Text ||
       event.messageType == MessageTypes.Notice ||
       event.messageType == MessageTypes.Emote;
+  // 图片/文件/视频：能「保存」和「转发」，但不该出现「复制」。
+  final hasAttachment = event.hasAttachment;
 
   final actions = <_MessageAction>[
     // 正在上传的消息允许停下：否则慢速网络下只能干等
@@ -70,6 +76,23 @@ Future<void> showMessageActionsMenu(
         icon: Icons.copy_outlined,
         label: l10n.copy,
         onTap: () => _copy(context, event),
+      ),
+    _MessageAction(
+      icon: Icons.forward_outlined,
+      label: l10n.forward,
+      onTap: () => _forward(context, event, isText: isText),
+    ),
+    if (isText)
+      _MessageAction(
+        icon: Icons.volume_up_outlined,
+        label: l10n.readAloud,
+        onTap: () => SpeechService.speak(event.plaintextBody),
+      ),
+    if (hasAttachment && !event.status.isSending)
+      _MessageAction(
+        icon: Icons.download_outlined,
+        label: l10n.save,
+        onTap: () => event.saveFile(context),
       ),
     if (event.messageType == MessageTypes.Sticker)
       _MessageAction(
@@ -318,6 +341,26 @@ void _copy(BuildContext context, Event event) {
   final l10n = L10n.of(context);
   Clipboard.setData(ClipboardData(text: event.body));
   AppToast.show(l10n.copiedToClipboard);
+}
+
+/// 转发：文字走文本，图片/文件走内容（保留 mxc 地址，不重新上传）。
+Future<void> _forward(
+  BuildContext context,
+  Event event, {
+  required bool isText,
+}) async {
+  final items = <ShareItem>[
+    if (isText)
+      TextShareItem(
+        event.plaintextBody.isEmpty ? event.body : event.plaintextBody,
+      )
+    else
+      ContentShareItem(event.content),
+  ];
+  await showScaffoldDialog(
+    context: context,
+    builder: (context) => ShareScaffoldDialog(items: items),
+  );
 }
 
 Future<void> _pickReminder(BuildContext context, Event event) async {

@@ -3359,5 +3359,6 @@
   "exportLogs": "Export logs",
   "exportLogsDone": "Exported to the Downloads folder",
   "exportLogsFailed": "Export failed",
-  "diagExportEmpty": "No logs yet"
+  "diagExportEmpty": "No logs yet",
+  "readAloud": "Read aloud"
 }

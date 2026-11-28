@@ -3359,5 +3359,6 @@
   "exportLogs": "导出日志",
   "exportLogsDone": "已导出到 Download 目录",
   "exportLogsFailed": "导出失败",
-  "diagExportEmpty": "还没有日志"
+  "diagExportEmpty": "还没有日志",
+  "readAloud": "朗读"
 }

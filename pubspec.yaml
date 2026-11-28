@@ -7,7 +7,7 @@ name: fluffychat
 description: Chat with your friends.
 publish_to: none
 # On version bump please also increase the build number (for F-Droid)
-version: 1.21.2+59
+version: 1.22.0+60
 
 environment:
   sdk: ">=3.11.1 <4.0.0"
@@ -43,6 +43,7 @@ dependencies:
   flutter_secure_storage: ^11.2.0
   flutter_shortcuts_new: ^2.1.0
   flutter_slidable: ^4.0.0
+  flutter_tts: ^4.2.5
   flutter_vodozemac: ^0.9.0
   flutter_web_auth_2: ^5.1.0
   flutter_webrtc: ^1.6.2+hotfix.3
